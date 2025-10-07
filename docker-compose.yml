@@ -1,14 +1,64 @@
-version: "3.9"
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0.5
-    command: start-dev
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+    image: quay.io/keycloak/keycloak:24.0.1
+    command: start-dev --import-realm
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
     volumes:
-      - kc_data_dev:/opt/keycloak/data
-volumes:
-  kc_data_dev:
+      - ./keycloak/realms:/opt/keycloak/data/import:ro 
+
+  fuseki-h1:
+    image: stain/jena-fuseki
+    platform: linux/amd64
+    command: ["/jena-fuseki/fuseki-server", "--mem", "/h1"]
+    ports:
+      - "3030:3030"
+    volumes:
+      - ./fuseki/shiro.ini:/fuseki/shiro.ini:ro
+      - ./data:/data:ro
+
+  fuseki-h2:
+    image: stain/jena-fuseki
+    platform: linux/amd64
+    command: ["/jena-fuseki/fuseki-server", "--mem", "/h2"]
+    ports:
+      - "3040:3030"
+    volumes:
+      - ./fuseki/shiro.ini:/fuseki/shiro.ini:ro
+      - ./data:/data:ro
+
+  fuseki-init:
+    image: curlimages/curl:8.8.0
+    depends_on:
+      - fuseki-h1
+      - fuseki-h2
+    entrypoint: ["/bin/sh","-c"]
+    command: >
+      set -e;
+      echo "⏳ Attente Fuseki H1/H2...";
+      for i in $(seq 1 60); do
+        (curl -fsS http://fuseki-h1:3030/\$/ping >/dev/null 2>&1) && \
+        (curl -fsS http://fuseki-h2:3030/\$/ping >/dev/null 2>&1) && break; sleep 2;
+      done;
+      echo "✅ Fuseki OK, upload TTL";
+      curl -i -X POST -F 'file=@/data/hopital1.ttl;type=text/turtle' 'http://fuseki-h1:3030/h1/upload?default';
+      curl -i -X POST -F 'file=@/data/hopital2.ttl;type=text/turtle' 'http://fuseki-h2:3030/h2/upload?default';
+
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./proxy/.env
+    environment:
+      - H1_SPARQL=http://fuseki-h1:3030/h1/sparql
+      - H2_SPARQL=http://fuseki-h2:3030/h2/sparql
+      - KEYCLOAK_URL=http://keycloak:8080
+    depends_on:
+      - keycloak
+      - fuseki-init
