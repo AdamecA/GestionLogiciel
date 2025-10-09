@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <title>Page Principale</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="container">
+    <h1 id="welcome-message">Chargement...</h1>
+    <pre id="roles-display"></pre>
+
+    <div class="query-section">
+        <div class="examples">
+            <button class="example-btn" onclick="chargerExemple(1)">Exemple 1</button>
+            <button class="example-btn" onclick="chargerExemple(2)">Exemple 2</button>
+            <button class="example-btn" onclick="chargerExemple(3)">Exemple 3</button>
+        </div>
+
+        <textarea id="sparql-query" placeholder="Requête SPARQL"></textarea>
+    </div>
+
+    <button id="submit-btn" type="button">Submit</button>
+</div>
+
+<script>
+    async function getToken(code) {
+        const url = 'http://localhost:8080/realms/myrealm/protocol/openid-connect/token';
+        const params = new URLSearchParams();
+        params.append('grant_type', 'authorization_code');
+        params.append('client_id', 'webapp');
+        params.append('code', code);
+        params.append('redirect_uri', 'http://localhost:3000/main.html');
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+            });
+            if (!response.ok) throw new Error('Erreur récupération token');
+            return await response.json();
+        } catch (err) {
+            console.error(err);
+            return null;
+        }
+    }
+
+    function parseJwt(token) {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+        return JSON.parse(jsonPayload);
+    }
+
+    function filtrerRoles(roles) {
+        const rolesASupprimer = ['offline_access', 'uma_authorization'];
+        return roles.filter(r => !rolesASupprimer.includes(r));
+    }
+
+    function querySegmentation(query) {
+        //TODO : diviser la requete par endpoint
+        //
+    }
+    function sendQuery(query) {
+        //TODO : envoyer la requete au endpoint approprie
+
+    }
+
+    async function main() {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        if (!code) return window.location.href = 'index.html';
+
+        const tokenData = await getToken(code);
+        if (!tokenData || !tokenData.access_token) return window.location.href = 'index.html';
+
+        const payload = parseJwt(tokenData.access_token);
+        const nom = payload.preferred_username || payload.name || "Utilisateur";
+        const userRealmRoles = filtrerRoles((payload.realm_access && payload.realm_access.roles) || []);
+
+        document.getElementById('welcome-message').textContent = `Bonjour ${nom} !`;
+        document.getElementById('roles-display').textContent =
+            `Rôles : ${userRealmRoles.join(', ') || 'Aucun'}`;
+
+        // 🎯 Gestion du bouton Submit
+        document.getElementById('submit-btn').addEventListener('click', () => {
+            const requete = document.getElementById('sparql-query').value.trim();
+            if (!requete) {
+                alert("Veuillez saisir une requête avant de soumettre !");
+                return;
+            }
+            console.log("Requête envoyée :", requete);
+            alert("Requête envoyée :\n" + requete);
+            //querySegmentation(requete);
+        });
+
+
+    }
+    async function chargerExemple(num) {
+        try {
+            const response = await fetch(`/Resources/queryExemple/exemple${num}.sparql`);
+            if (!response.ok) {
+                throw new Error(`Erreur lors du chargement de l'exemple ${num}`);
+            }
+            const requete = await response.text();
+            document.getElementById('sparql-query').value = requete;
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    main();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,158 @@
+/* Styles généraux */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    background-color: #fafafa;
+    color: #333;
+}
+
+/* Page d'accueil */
+body.home {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f2f2f2;
+    text-align: center;
+}
+
+.center-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.center-box h1 {
+    margin-bottom: 20px;
+}
+
+.center-box button {
+    padding: 15px 40px;
+    font-size: 18px;
+    cursor: pointer;
+    background-color: #007bff;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.center-box button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+/* Conteneur principal */
+.container {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+/* Message de bienvenue et rôles */
+#welcome-message {
+    font-size: 1.8em;
+    margin-bottom: 10px;
+    color: #222;
+}
+
+#roles-display {
+    margin-bottom: 25px;
+    color: #555;
+    white-space: pre-wrap;
+}
+
+/* --- SECTION TEXTAREA + BOUTONS EXEMPLES --- */
+.query-section {
+    position: relative;
+    width: 90%;
+    max-width: 950px;
+    display: flex;
+    justify-content: center;
+}
+
+/* --- Boutons d’exemple (fixés à gauche du textarea) --- */
+.examples {
+    position: absolute;
+    left: -140px; /* ⬅️ décalage à gauche du textarea */
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.example-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white; /* ✅ texte blanc */
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.example-btn:hover {
+    background: linear-gradient(135deg, #3399ff, #0062cc);
+    transform: translateX(5px) scale(1.03);
+}
+
+.example-btn:active {
+    transform: scale(1);
+}
+
+/* Zone de texte SPARQL */
+textarea#sparql-query {
+    width: 100%;
+    height: 55vh;
+    padding: 14px 18px;
+    font-size: 16px;
+    border: 1.5px solid #ccc;
+    border-radius: 14px;
+    resize: none;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+textarea#sparql-query:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 6px rgba(0, 123, 255, 0.3);
+}
+
+/* Bouton Submit */
+#submit-btn {
+    margin-top: 25px;
+    padding: 12px 40px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+#submit-btn:hover {
+    background: linear-gradient(135deg, #3399ff, #0062cc);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+}
+
+#submit-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}

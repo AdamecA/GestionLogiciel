@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  web:
+    image: nginx:latest
+    container_name: nginx-web
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3000:80"
+    restart: always
+
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./Data/config/mainKeycloak:/opt/keycloak/data/import
+    ports:
+      - "8080:8080"
+    restart: always

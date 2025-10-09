@@ -1,0 +1,201 @@
+{
+  "id": "myrealm",
+  "realm": "myrealm",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "admin" },
+      { "name": "user" },
+      { "name": "manager" },
+      { "name": "developer" },
+      { "name": "guest" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "webapp",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": ["http://localhost:3000/*"],
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "defaultRoles": [],
+      "webOrigins": ["*"]
+    }
+  ],
+  "users": [
+    {
+      "enabled": true,
+      "username": "alice",
+      "firstName": "Alice",
+      "lastName": "Anderson",
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "user"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "bob",
+      "firstName": "Bob",
+      "lastName": "Brown",
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "carol",
+      "firstName": "Carol",
+      "lastName": "Clark",
+      "email": "carol@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "carol",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["manager"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "dave",
+      "firstName": "Dave",
+      "lastName": "Davis",
+      "email": "dave@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dave",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["developer"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "eve",
+      "firstName": "Eve",
+      "lastName": "Evans",
+      "email": "eve@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "eve",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["guest"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "frank",
+      "firstName": "Frank",
+      "lastName": "Foster",
+      "email": "frank@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "guest",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "grace",
+      "firstName": "Grace",
+      "lastName": "Green",
+      "email": "grace@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "grace",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["manager", "developer"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "heidi",
+      "firstName": "Heidi",
+      "lastName": "Hunt",
+      "email": "heidi@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "heidi",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["guest"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "ivan",
+      "firstName": "Ivan",
+      "lastName": "Ivers",
+      "email": "ivan@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ivan",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["developer"],
+      "requiredActions": []
+    },
+    {
+      "enabled": true,
+      "username": "judy",
+      "firstName": "Judy",
+      "lastName": "Jones",
+      "email": "judy@example.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "judy",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"],
+      "requiredActions": []
+    }
+  ]
+}

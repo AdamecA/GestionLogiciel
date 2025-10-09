@@ -1,0 +1,9 @@
+services:
+  fuseki:
+    image: stain/jena-fuseki
+    platform: linux/amd64
+    container_name: fuseki-H2
+    ports:
+      - "3032:3030"
+    environment:
+      - ADMIN_PASSWORD=admin

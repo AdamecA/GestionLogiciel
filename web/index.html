@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Page de Connexion</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="home">
+<div class="center-box">
+    <h1>Bienvenue !</h1>
+    <button onclick="login()">Connexion</button>
+</div>
+
+<script>
+    function login() {
+        const keycloakBase = "http://localhost:8080/realms/myrealm/protocol/openid-connect/auth";
+        const clientId = "webapp";
+        const redirectUri = encodeURIComponent("http://localhost:3000/main.html");
+        const responseType = "code";
+        const scope = "openid";
+
+        window.location.href = `${keycloakBase}?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=${responseType}&scope=${scope}`;
+    }
+</script>
+</body>
+</html>
