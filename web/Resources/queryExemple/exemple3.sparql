@@ -1,0 +1,5 @@
+PREFIX dbo: <http://dbpedia.org/ontology/>
+SELECT ?city ?country WHERE {
+    ?city a dbo:City ;
+    dbo:country ?country .
+} LIMIT 5,
