@@ -1,0 +1,12 @@
+{
+  "name": "capstone-pep",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^4.19.2",
+    "http-proxy-middleware": "^2.0.6",
+    "jose": "^5.9.3"
+  },
+  "scripts": {
+    "start:h1": "PORT=8081 REQUIRED_ROLE=study_A ISSUER=http://localhost:8080/realms/capstone JWKS_URI=http://localhost:8080/realms/capstone/protocol/openid-connect/certs UPSTREAM_SPARQL=http://localhost:3030/H1/query node pep.js"
+  }
+}
