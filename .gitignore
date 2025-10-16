@@ -1,0 +1,9 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Docker
+**/.DS_Store
+**/.env
+**/db/
+**/dist/

@@ -7,3 +7,49 @@ services:
       - "3031:3030"
     environment:
       - ADMIN_PASSWORD=admin
+      # Auto-crée un dataset "dataset" (en mémoire)
+      - FUSEKI_DATASET_1=dataset
+      - FUSEKI_DATASET_1_TYPE=mem
+    networks:
+      - hospital-net
+
+  proxy1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: proxy1
+    ports:
+      - "4000:4000"
+    environment:
+      - PUBLIC_ISSUER=http://localhost:8080/realms/myrealm
+      - JWKS_URI=http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs
+      - FUSEKI_URL=http://fuseki:3030/dataset/query   # <-- utilise le nom de service "fuseki"
+      - EXPECTED_CLIENT=webapp
+    depends_on:
+      - fuseki
+    networks:
+      - hospital-net
+      - gestionlogiciel_default
+
+  h1-loader:
+    image: curlimages/curl:8.7.1
+    container_name: h1-loader
+    depends_on:
+      - fuseki
+    command: ["/bin/sh", "-c", "/loader/loader.sh"]
+    volumes:
+      - ./data:/data:ro
+      - ./loader.sh:/loader/loader.sh:ro
+    environment:
+      - FUSEKI_URL=http://fuseki:3030          # <-- utilise "fuseki" (service), pas container_name
+      - DATA_FILE=/data/h1.ttl
+      - ADMIN_USER=admin
+      - ADMIN_PASS=admin
+    networks:
+      - hospital-net
+
+networks:
+  hospital-net:
+    driver: bridge
+  gestionlogiciel_default:
+    external: true

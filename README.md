@@ -47,6 +47,10 @@ Cette commande démarre tous les conteneurs en mode détaché (arrière-plan).
 ```bash
 docker ps
 ```
+### charger les données RDF dans Fuseki H1
+```bash
+chmod +x HOPITAL/H1/loader.sh
+```
 
 ## 🛑 Arrêt des services
 

@@ -1,4 +1,9 @@
-PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-SELECT ?person WHERE {
-  ?person a foaf:Person .
-} LIMIT 10
+PREFIX ex: <http://example.org/schema#>
+PREFIX res: <http://example.org/resource/>
+
+SELECT ?p ?age ?aneu WHERE {
+  ?p a ex:Patient ;
+     ex:partOf res:study_A ;
+     ex:hasAge ?age ;
+     ex:hasAneurysm ?aneu .
+}

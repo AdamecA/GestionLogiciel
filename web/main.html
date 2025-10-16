@@ -67,9 +67,33 @@
         //TODO : diviser la requete par endpoint
         //
     }
-    function sendQuery(query) {
-        //TODO : envoyer la requete au endpoint approprie
 
+    async function sendQuery(query, token) {
+        try {
+            const response = await fetch("http://localhost:4000/query", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ sparql: query })
+            });
+
+            if (!response.ok) {
+                // remonte le message renvoyé par le proxy pour diagnostics
+                const errText = await response.text().catch(() => "");
+                throw new Error(`Erreur proxy (${response.status})${errText ? " — " + errText : ""}`);
+            }
+
+            // ⬇️ le proxy renvoie du TEXTE
+            const text = await response.text();
+            console.log("Résultat reçu du proxy :", text);
+            alert("✅ Résultat reçu du proxy :\n" + text);
+
+        } catch (err) {
+            console.error("Erreur d'envoi au proxy :", err);
+            alert("❌ " + err.message);
+        }
     }
 
     async function main() {
@@ -80,7 +104,10 @@
         const tokenData = await getToken(code);
         if (!tokenData || !tokenData.access_token) return window.location.href = 'index.html';
 
+        // (optionnel) debug rapide du token
         const payload = parseJwt(tokenData.access_token);
+        console.log("Token payload:", payload); // tu y verras iss / aud / azp
+
         const nom = payload.preferred_username || payload.name || "Utilisateur";
         const userRealmRoles = filtrerRoles((payload.realm_access && payload.realm_access.roles) || []);
 
@@ -88,7 +115,6 @@
         document.getElementById('roles-display').textContent =
             `Rôles : ${userRealmRoles.join(', ') || 'Aucun'}`;
 
-        // 🎯 Gestion du bouton Submit
         document.getElementById('submit-btn').addEventListener('click', () => {
             const requete = document.getElementById('sparql-query').value.trim();
             if (!requete) {
@@ -96,12 +122,11 @@
                 return;
             }
             console.log("Requête envoyée :", requete);
-            alert("Requête envoyée :\n" + requete);
-            //querySegmentation(requete);
+            // ⬇️ on envoie bien l'ACCESS TOKEN au proxy
+            sendQuery(requete, tokenData.access_token);
         });
-
-
     }
+
     async function chargerExemple(num) {
         try {
             const response = await fetch(`/Resources/queryExemple/exemple${num}.sparql`);

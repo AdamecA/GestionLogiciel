@@ -1,4 +1,1 @@
-PREFIX dc: <http://purl.org/dc/elements/1.1/>
-SELECT ?title WHERE {
- ?book dc:title ?title .
- } LIMIT 5 };
+SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }
