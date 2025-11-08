@@ -68,7 +68,7 @@ function verifyToken(token) {
 
                 const audOk =
                     aud.includes(EXPECTED_CLIENT) ||
-                    aud.includes("proxy1") ||
+                    aud.includes("proxy") ||
                     aud.includes("account") ||
                     azp === EXPECTED_CLIENT;
 
@@ -103,7 +103,10 @@ app.post("/query", async (req, res) => {
             "| azp:", decoded.azp,
             "| aud:", decoded.aud
         );
-
+        
+        //TODO 
+        //vérifier la politique au près de Keycloak local
+        
         // Envoie la requête SPARQL à Fuseki (format: application/sparql-query)
         const fusekiRes = await fetch(FUSEKI_URL, {
             method: "POST",
@@ -122,4 +125,4 @@ app.post("/query", async (req, res) => {
     }
 });
 
-app.listen(4000, () => console.log("🚀 Proxy1 (H1) en écoute sur le port 4000"));
+app.listen(4000, () => console.log("🚀 Proxy (H1) en écoute sur le port 4000"));

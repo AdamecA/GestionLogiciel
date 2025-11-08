@@ -1,5 +1,11 @@
-PREFIX dbo: <http://dbpedia.org/ontology/>
-SELECT ?city ?country WHERE {
-    ?city a dbo:City ;
-    dbo:country ?country .
-} LIMIT 5,
+PREFIX ex: <http://example.org/schema#>
+PREFIX res: <http://example.org/resource/>
+
+SELECT ?p ?age ?aneu WHERE {
+    SERVICE <http://localhost:4000/sparql> {
+      ?p a ex:Patient ;
+         ex:partOf res:study_A ;
+         ex:hasAge ?age ;
+         ex:hasAneurysm ?aneu .
+    }
+}

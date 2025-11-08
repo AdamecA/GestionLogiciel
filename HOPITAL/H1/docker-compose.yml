@@ -13,7 +13,7 @@ services:
     networks:
       - hospital-net
 
-  proxy1:
+  proxy:
     build:
       context: .
       dockerfile: Dockerfile

@@ -1,6 +1,0 @@
-PREFIX ex: <http://example.org/schema#>
-
-SELECT ?p ?age WHERE {
-  ?p a ex:Patient ;
-     ex:hasAge ?age .
-}

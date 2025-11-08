@@ -21,6 +21,7 @@
     </div>
 
     <button id="submit-btn" type="button">Submit</button>
+    <div id="results-container" class="results"></div>
 </div>
 
 <script>
@@ -64,36 +65,116 @@
     }
 
     function querySegmentation(query) {
-        //TODO : diviser la requete par endpoint
-        //
+        const serviceRegex = /SERVICE\s+<([^>]+)>\s*\{([\s\S]*?)\}/gi;
+        const services = [];
+        let match;
+
+        while ((match = serviceRegex.exec(query)) !== null) {
+            services.push({
+                endpoint: match[1].trim(),  // ex: http://localhost:4000/sparql
+                body: match[2].trim()       // le contenu du bloc SPARQL
+            });
+        }
+
+        return services;
     }
 
     async function sendQuery(query, token) {
-        try {
-            const response = await fetch("http://localhost:4000/query", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ sparql: query })
-            });
-
-            if (!response.ok) {
-                // remonte le message renvoyé par le proxy pour diagnostics
-                const errText = await response.text().catch(() => "");
-                throw new Error(`Erreur proxy (${response.status})${errText ? " — " + errText : ""}`);
-            }
-
-            // ⬇️ le proxy renvoie du TEXTE
-            const text = await response.text();
-            console.log("Résultat reçu du proxy :", text);
-            alert("✅ Résultat reçu du proxy :\n" + text);
-
-        } catch (err) {
-            console.error("Erreur d'envoi au proxy :", err);
-            alert("❌ " + err.message);
+        const services = querySegmentation(query);
+        const prefixes = query.match(/^PREFIX\s+[^\n]+\n?/gim)?.join('') || '';
+        
+        if (services.length === 0) {
+            alert("⚠️ Aucune clause SERVICE trouvée dans la requête !");
+            return;
         }
+
+        // Tableau pour stocker les résultats partiels
+        const results = [];
+
+        for (const service of services) {
+            const proxyUrl = service.endpoint.replace("/sparql", "/query"); // ex: http://localhost:4000/query
+            console.log(`➡️ Envoi de la sous-requête à ${proxyUrl}`);
+
+            try {
+                const response = await fetch(proxyUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        sparql: `${prefixes}\nSELECT * WHERE { ${service.body} }`
+                    })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`Erreur proxy ${proxyUrl} (${response.status}) — ${errText}`);
+                }
+
+                const text = await response.text();
+                console.log(`✅ Réponse de ${proxyUrl}:`, text);
+                results.push({ endpoint: proxyUrl, result: text });
+
+            } catch (err) {
+                console.error(`❌ Erreur avec ${service.endpoint}:`, err);
+                results.push({ endpoint: service.endpoint, error: err.message });
+            }
+        }
+
+        afficherResultats(results);
+    }
+
+    function afficherResultats(results) {
+        // Fusionne les bindings venant de tous les proxies
+        const mergedBindings = results.flatMap(r => {
+            try {
+                const json = typeof r.result === "string" ? JSON.parse(r.result) : r.result;
+                return json?.results?.bindings || [];
+            } catch (e) {
+                console.error("Erreur parsing JSON:", e);
+                return [];
+            }
+        });
+
+        const container = document.getElementById("results-container");
+        container.innerHTML = ""; // on vide avant d'afficher les nouveaux résultats
+
+        if (mergedBindings.length === 0) {
+            container.innerHTML = "<p>Aucun résultat trouvé.</p>";
+            return;
+        }
+
+        // 🔹 Récupération dynamique des noms de colonnes à partir de la première ligne
+        const allVars = Object.keys(mergedBindings[0] || {});
+
+        // 🔹 Construction du tableau HTML dynamique
+        let html = `
+        <h3>Résultats de la requête</h3>
+        <table style="border-collapse:collapse;width:100%;text-align:left">
+            <thead>
+                <tr style="background-color:#007bff;color:white">
+                    ${allVars.map(v => `<th style="padding:6px">${v}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+        mergedBindings.forEach(binding => {
+            html += "<tr>";
+            allVars.forEach(v => {
+                const val = binding[v]?.value || "—";
+                html += `<td style="padding:6px;border-bottom:1px solid #ddd">${val}</td>`;
+            });
+            html += "</tr>";
+        });
+
+        html += `
+            </tbody>
+        </table>
+    `;
+
+        container.innerHTML = html;
     }
 
     async function main() {

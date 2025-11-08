@@ -65,6 +65,9 @@ chmod +x stop.sh
 ## 🌐 Accès aux services
 Une fois les services démarrés, vous pouvez y accéder via :
 
+**Proxy H1 :**
+- URL : http://localhost:4000
+
 **Service : Fuseki H1**
 - URL : http://localhost:3030
 - Identifiants : admin / admin

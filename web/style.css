@@ -156,3 +156,21 @@ textarea#sparql-query:focus {
     transform: translateY(0);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
 }
+
+#results-container table {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    margin-top: 15px;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
+
+#results-container th, #results-container td {
+    padding: 8px 12px;
+}
+
+#results-container tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
