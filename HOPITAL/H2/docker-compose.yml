@@ -11,7 +11,7 @@ services:
       - FUSEKI_DATASET_2=dataset
       - FUSEKI_DATASET_2_TYPE=mem
     networks:
-      - hospital-net
+      - hospital2-net
 
   proxy:
     build:
@@ -28,7 +28,7 @@ services:
     depends_on:
       - fuseki
     networks:
-      - hospital-net
+      - hospital2-net
       - gestionlogiciel_default
 
   h1-loader:
@@ -46,10 +46,10 @@ services:
       - ADMIN_USER=admin
       - ADMIN_PASS=admin
     networks:
-      - hospital-net
+      - hospital2-net
 
 networks:
-  hospital-net:
+  hospital2-net:
     driver: bridge
   gestionlogiciel_default:
     external: true

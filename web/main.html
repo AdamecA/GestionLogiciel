@@ -84,7 +84,7 @@
         const prefixes = query.match(/^PREFIX\s+[^\n]+\n?/gim)?.join('') || '';
         
         if (services.length === 0) {
-            alert("⚠️ Aucune clause SERVICE trouvée dans la requête !");
+            alert("⚠️ SERVICE : à quel hôpital envoyer la requête ? ");
             return;
         }
 

@@ -7,5 +7,5 @@ RUN npm install
 
 COPY proxy.js .
 
-EXPOSE 4001
+EXPOSE 4000
 CMD ["node", "proxy.js"]
