@@ -1,4 +1,4 @@
-import express from "express";    
+import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";            // Pour autoriser les requêtes cross-origin (depuis le front)
 import jwt from "jsonwebtoken";     // Pour vérifier localement le JWT (signature/claims)
@@ -103,10 +103,10 @@ app.post("/query", async (req, res) => {
             "| azp:", decoded.azp,
             "| aud:", decoded.aud
         );
-        
+
         //TODO 
         //vérifier la politique au près de Keycloak local
-        
+
         // Envoie la requête SPARQL à Fuseki (format: application/sparql-query)
         const fusekiRes = await fetch(FUSEKI_URL, {
             method: "POST",
@@ -122,6 +122,42 @@ app.post("/query", async (req, res) => {
         // En cas d’échec de vérification du token ou autre
         console.error("❌ Erreur token :", err.message);
         res.status(403).json({ error: "Erreur proxy (403): " + err.message });
+    }
+});
+
+app.all("/sparql", async (req, res) => {
+    let queryText = "";
+
+    if (req.method === "POST") {
+        queryText = req.body?.toString?.() || "";
+    } else if (req.method === "GET" && req.query.query) {
+        queryText = req.query.query;
+    }
+
+    // 🔐 Récupération du token depuis l’URL
+    const token = req.query.token;
+    if (!token) {
+        return res.status(401).json({ error: "Token manquant" });
+    }
+
+    try {
+        const decoded = await verifyToken(token);
+        console.log("✅ Token valide pour:", decoded.preferred_username);
+
+        const fusekiRes = await fetch(process.env.FUSEKI_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/sparql-query" },
+            body: queryText,
+        });
+
+        const text = await fusekiRes.text();
+        const contentType = fusekiRes.headers.get("content-type") || "application/sparql-results+json";
+        res.set("Content-Type", contentType);
+        res.status(fusekiRes.status).send(text);
+
+    } catch (err) {
+        console.error("❌ Erreur proxy /sparql:", err.message);
+        res.status(403).json({ error: err.message });
     }
 });
 

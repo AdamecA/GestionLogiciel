@@ -1,4 +1,4 @@
-import express from "express";    
+import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";            // Pour autoriser les requêtes cross-origin (depuis le front)
 import jwt from "jsonwebtoken";     // Pour vérifier localement le JWT (signature/claims)
@@ -103,10 +103,10 @@ app.post("/query", async (req, res) => {
             "| azp:", decoded.azp,
             "| aud:", decoded.aud
         );
-        
+
         //TODO 
         //vérifier la politique au près de Keycloak local
-        
+
         // Envoie la requête SPARQL à Fuseki (format: application/sparql-query)
         const fusekiRes = await fetch(FUSEKI_URL, {
             method: "POST",
@@ -125,4 +125,45 @@ app.post("/query", async (req, res) => {
     }
 });
 
-app.listen(4000, () => console.log("🚀 Proxy (H2) en écoute sur le port 4001"));
+// endpoint /sparql — utilisé par le Fuseki fédérateur
+app.all("/sparql", async (req, res) => {
+    let queryText = "";
+
+    // Si c’est un POST (Content-Type: application/sparql-query)
+    if (req.method === "POST") {
+        queryText = req.body?.toString?.() || "";
+    }
+    // Si c’est un GET (typique de Fuseki SERVICE)
+    else if (req.method === "GET" && req.query.query) {
+        queryText = req.query.query;
+    }
+
+    if (!queryText) {
+        return res.status(400).json({ error: "Aucune requête SPARQL reçue" });
+    }
+
+    try {
+        console.log("🔁 Redirection /sparql →", process.env.FUSEKI_URL);
+
+        const fusekiRes = await fetch(process.env.FUSEKI_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/sparql-query" },
+            body: queryText,
+        });
+
+        const text = await fusekiRes.text();
+
+        // récupère le vrai content-type de Fuseki (JSON, XML, etc.)
+        const contentType = fusekiRes.headers.get("content-type") || "application/sparql-results+json";
+
+        // transmet ce même content-type au client (le Fuseki Global)
+        res.set("Content-Type", contentType);
+        res.status(fusekiRes.status).send(text);
+
+    } catch (err) {
+        console.error("❌ Erreur proxy /sparql:", err);
+        res.status(502).json({ error: err.message });
+    }
+});
+
+app.listen(4000, () => console.log("🚀 Proxy (H2) en écoute sur le port 4000"));

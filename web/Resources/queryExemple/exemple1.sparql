@@ -1,7 +1,7 @@
 PREFIX ex: <http://example.org/schema#>
 
 SELECT ?p ?age WHERE {
-  SERVICE <http://localhost:4000/sparql> {
+  SERVICE <http://proxy1:4000/sparql> {
     ?p a ex:Patient ;
        ex:hasAge ?age . 
   }

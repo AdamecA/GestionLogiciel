@@ -4,19 +4,23 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
 SELECT ?patient ?age ?image
 WHERE {
-  SERVICE <http://localhost:4000/sparql> {
-    ?patient a ex:Patient ;
-             ex:partOf res:study_A ;
-             ex:hasAge ?age ;
-             ex:hasImage ?image .
-    FILTER(xsd:integer(?age) < 50)
+  {
+    SERVICE <http://proxy1:4000/sparql> {
+      ?patient a ex:Patient ;
+               ex:partOf res:study_A ;
+               ex:hasAge ?age ;
+               ex:hasImage ?image .
+      FILTER(xsd:integer(?age) < 50)
+    }
   }
-
-  SERVICE <http://localhost:4001/sparql> {
-    ?patient a ex:Patient ;
-             ex:partOf res:study_A ;
-             ex:hasAge ?age ;
-             ex:hasImage ?image .
-    FILTER(xsd:integer(?age) < 50)
+  UNION
+  {
+    SERVICE <http://proxy2:4000/sparql> {
+      ?patient a ex:Patient ;
+               ex:partOf res:study_A ;
+               ex:hasAge ?age ;
+               ex:hasImage ?image .
+      FILTER(xsd:integer(?age) < 50)
+    }
   }
 }

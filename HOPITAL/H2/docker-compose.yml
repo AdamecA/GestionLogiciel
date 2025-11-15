@@ -31,7 +31,7 @@ services:
       - hospital2-net
       - gestionlogiciel_default
 
-  h1-loader:
+  h2-loader:
     image: curlimages/curl:8.7.1
     container_name: h2-loader
     depends_on:

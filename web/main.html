@@ -25,6 +25,9 @@
 </div>
 
 <script>
+    // ─────────────────────────────────────────────
+    // 🔑 Authentification & Token
+    // ─────────────────────────────────────────────
     async function getToken(code) {
         const url = 'http://localhost:8080/realms/myrealm/protocol/openid-connect/token';
         const params = new URLSearchParams();
@@ -64,69 +67,55 @@
         return roles.filter(r => !rolesASupprimer.includes(r));
     }
 
-    function querySegmentation(query) {
-        const serviceRegex = /SERVICE\s+<([^>]+)>\s*\{([\s\S]*?)\}/gi;
-        const services = [];
-        let match;
-
-        while ((match = serviceRegex.exec(query)) !== null) {
-            services.push({
-                endpoint: match[1].trim(),  // ex: http://localhost:4000/sparql
-                body: match[2].trim()       // le contenu du bloc SPARQL
-            });
-        }
-
-        return services;
+    // ─────────────────────────────────────────────
+    // 💉 Injection automatique du token dans chaque SERVICE
+    // ─────────────────────────────────────────────
+    function injectTokenInQuery(query, token) {
+        return query.replace(/SERVICE\s+<([^>]+)>/g, (match, url) => {
+            const sep = url.includes("?") ? "&" : "?";
+            const securedUrl = `${url}${sep}token=${encodeURIComponent(token)}`;
+            return `SERVICE <${securedUrl}>`;
+        });
     }
 
+
+    // ─────────────────────────────────────────────
+    // 🚀 Envoi de la requête au Fuseki fédérateur
+    // ─────────────────────────────────────────────
     async function sendQuery(query, token) {
-        const services = querySegmentation(query);
-        const prefixes = query.match(/^PREFIX\s+[^\n]+\n?/gim)?.join('') || '';
-        
-        if (services.length === 0) {
-            alert("⚠️ SERVICE : à quel hôpital envoyer la requête ? ");
-            return;
-        }
+        const fusekiGlobalUrl = "http://localhost:3030/dataset/query";
+        const queryWithToken = injectTokenInQuery(query, token);
 
-        // Tableau pour stocker les résultats partiels
-        const results = [];
+        console.log("➡️ Requête envoyée au Fuseki fédérateur :", queryWithToken);
 
-        for (const service of services) {
-            const proxyUrl = service.endpoint.replace("/sparql", "/query"); // ex: http://localhost:4000/query
-            console.log(`➡️ Envoi de la sous-requête à ${proxyUrl}`);
+        try {
+            const response = await fetch(fusekiGlobalUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/sparql-query",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: queryWithToken
+            });
 
-            try {
-                const response = await fetch(proxyUrl, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        sparql: `${prefixes}\nSELECT * WHERE { ${service.body} }`
-                    })
-                });
-
-                if (!response.ok) {
-                    const errText = await response.text();
-                    throw new Error(`Erreur proxy ${proxyUrl} (${response.status}) — ${errText}`);
-                }
-
-                const text = await response.text();
-                console.log(`✅ Réponse de ${proxyUrl}:`, text);
-                results.push({ endpoint: proxyUrl, result: text });
-
-            } catch (err) {
-                console.error(`❌ Erreur avec ${service.endpoint}:`, err);
-                results.push({ endpoint: service.endpoint, error: err.message });
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Erreur Fuseki Global (${response.status}) — ${errText}`);
             }
-        }
 
-        afficherResultats(results);
+            const text = await response.text();
+            console.log("✅ Réponse Fuseki Global :", text);
+            afficherResultats([{ endpoint: fusekiGlobalUrl, result: text }]);
+        } catch (err) {
+            console.error("❌ Erreur sendQuery :", err);
+            alert(err.message);
+        }
     }
 
+    // ─────────────────────────────────────────────
+    // 🧱 Affichage des résultats dans la page
+    // ─────────────────────────────────────────────
     function afficherResultats(results) {
-        // Fusionne les bindings venant de tous les proxies
         const mergedBindings = results.flatMap(r => {
             try {
                 const json = typeof r.result === "string" ? JSON.parse(r.result) : r.result;
@@ -138,17 +127,15 @@
         });
 
         const container = document.getElementById("results-container");
-        container.innerHTML = ""; // on vide avant d'afficher les nouveaux résultats
+        container.innerHTML = ""; // On vide avant chaque affichage
 
         if (mergedBindings.length === 0) {
             container.innerHTML = "<p>Aucun résultat trouvé.</p>";
             return;
         }
 
-        // 🔹 Récupération dynamique des noms de colonnes à partir de la première ligne
         const allVars = Object.keys(mergedBindings[0] || {});
 
-        // 🔹 Construction du tableau HTML dynamique
         let html = `
         <h3>Résultats de la requête</h3>
         <table style="border-collapse:collapse;width:100%;text-align:left">
@@ -158,7 +145,7 @@
                 </tr>
             </thead>
             <tbody>
-    `;
+        `;
 
         mergedBindings.forEach(binding => {
             html += "<tr>";
@@ -169,14 +156,13 @@
             html += "</tr>";
         });
 
-        html += `
-            </tbody>
-        </table>
-    `;
-
+        html += `</tbody></table>`;
         container.innerHTML = html;
     }
 
+    // ─────────────────────────────────────────────
+    // 🧠 Initialisation de la page
+    // ─────────────────────────────────────────────
     async function main() {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
@@ -185,9 +171,8 @@
         const tokenData = await getToken(code);
         if (!tokenData || !tokenData.access_token) return window.location.href = 'index.html';
 
-        // (optionnel) debug rapide du token
         const payload = parseJwt(tokenData.access_token);
-        console.log("Token payload:", payload); // tu y verras iss / aud / azp
+        console.log("Token payload:", payload);
 
         const nom = payload.preferred_username || payload.name || "Utilisateur";
         const userRealmRoles = filtrerRoles((payload.realm_access && payload.realm_access.roles) || []);
@@ -202,18 +187,21 @@
                 alert("Veuillez saisir une requête avant de soumettre !");
                 return;
             }
-            console.log("Requête envoyée :", requete);
-            // ⬇️ on envoie bien l'ACCESS TOKEN au proxy
+
+            // Efface les anciens résultats
+            document.getElementById("results-container").innerHTML = "";
+
             sendQuery(requete, tokenData.access_token);
         });
     }
 
+    // ─────────────────────────────────────────────
+    // 📁 Chargement des exemples prédéfinis
+    // ─────────────────────────────────────────────
     async function chargerExemple(num) {
         try {
             const response = await fetch(`/Resources/queryExemple/exemple${num}.sparql`);
-            if (!response.ok) {
-                throw new Error(`Erreur lors du chargement de l'exemple ${num}`);
-            }
+            if (!response.ok) throw new Error(`Erreur lors du chargement de l'exemple ${num}`);
             const requete = await response.text();
             document.getElementById('sparql-query').value = requete;
         } catch (err) {
@@ -223,6 +211,5 @@
 
     main();
 </script>
-
 </body>
 </html>
