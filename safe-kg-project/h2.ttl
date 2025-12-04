@@ -1,0 +1,25 @@
+@prefix ex: <http://example.org/schema#> .
+@prefix res: <http://example.org/resource/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+res:study_A a ex:Study .
+res:study_B a ex:Study .
+
+res:patient3 a ex:Patient ;
+  ex:partOf res:study_B ;
+  ex:hasMutation res:gen_mut3 ;
+  ex:hasAge "30"^^xsd:integer ;
+  ex:hasAneurysm "true"^^xsd:boolean .
+  
+res:patient4 a ex:Patient ;
+  ex:partOf res:study_B ;
+  ex:hasImage res:image4 ;
+  ex:hasAge "70"^^xsd:integer ;
+  ex:hasAneurysm "true"^^xsd:boolean .
+  
+res:patient5 a ex:Patient ;
+    ex:partOf res:study_A , res:study_B ;
+    ex:hasImage res:image5 ;
+    ex:hasMutation res:gen_mut5 ;
+    ex:hasAge "45"^^xsd:integer ;
+    ex:hasAneurysm "true"^^xsd:boolean .

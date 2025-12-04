@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-keycloak
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - safe-kg-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: password
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8090
+      KC_HTTP_PORT: 8090
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_FEATURES: token-exchange
+    ports:
+      - "8090:8090"
+    depends_on:
+      - postgres
+    command: start-dev --http-port=8090 --features=token-exchange
+    networks:
+      - safe-kg-network
+
+  fuseki-hospital-a:
+    image: secoresearch/fuseki:latest
+    container_name: fuseki-hospital-a
+    environment:
+      ADMIN_PASSWORD: admin123
+      TDB: "2"
+    ports:
+      - "3031:3030"
+    volumes:
+      - fuseki-h1-data:/fuseki-base
+    networks:
+      - safe-kg-network
+
+  nginx-hospital-a:
+    image: nginx:alpine
+    container_name: nginx-hospital-a
+    ports:
+      - "3041:80" 
+    volumes:
+      - ./nginx/hospital-a.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - keycloak
+      - fuseki-hospital-a
+    networks:
+      - safe-kg-network
+
+networks:
+  safe-kg-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  fuseki-h1-data:
