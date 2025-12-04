@@ -26,7 +26,7 @@
 
 <script>
     // ─────────────────────────────────────────────
-    // 🔑 Authentification & Token
+    //  Authentification & Token
     // ─────────────────────────────────────────────
     async function getToken(code) {
         const url = 'http://localhost:8080/realms/myrealm/protocol/openid-connect/token';
@@ -66,36 +66,20 @@
         const rolesASupprimer = ['offline_access', 'uma_authorization'];
         return roles.filter(r => !rolesASupprimer.includes(r));
     }
-
+    
     // ─────────────────────────────────────────────
-    // 💉 Injection automatique du token dans chaque SERVICE
+    // Envoi de la requête au Fuseki fédérateur
     // ─────────────────────────────────────────────
-    function injectTokenInQuery(query, token) {
-        return query.replace(/SERVICE\s+<([^>]+)>/g, (match, url) => {
-            const sep = url.includes("?") ? "&" : "?";
-            const securedUrl = `${url}${sep}token=${encodeURIComponent(token)}`;
-            return `SERVICE <${securedUrl}>`;
-        });
-    }
-
-
-    // ─────────────────────────────────────────────
-    // 🚀 Envoi de la requête au Fuseki fédérateur
-    // ─────────────────────────────────────────────
-    async function sendQuery(query, token) {
+    async function sendQuery(query) {
         const fusekiGlobalUrl = "http://localhost:3030/dataset/query";
-        const queryWithToken = injectTokenInQuery(query, token);
-
-        console.log("➡️ Requête envoyée au Fuseki fédérateur :", queryWithToken);
 
         try {
             const response = await fetch(fusekiGlobalUrl, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/sparql-query",
-                    "Authorization": `Bearer ${token}`
+                    "Content-Type": "application/sparql-query"
                 },
-                body: queryWithToken
+                body: query
             });
 
             if (!response.ok) {
@@ -104,16 +88,15 @@
             }
 
             const text = await response.text();
-            console.log("✅ Réponse Fuseki Global :", text);
             afficherResultats([{ endpoint: fusekiGlobalUrl, result: text }]);
         } catch (err) {
-            console.error("❌ Erreur sendQuery :", err);
+            console.error("Erreur sendQuery :", err);
             alert(err.message);
         }
     }
 
     // ─────────────────────────────────────────────
-    // 🧱 Affichage des résultats dans la page
+    //  Affichage des résultats dans la page
     // ─────────────────────────────────────────────
     function afficherResultats(results) {
         const mergedBindings = results.flatMap(r => {
@@ -161,7 +144,7 @@
     }
 
     // ─────────────────────────────────────────────
-    // 🧠 Initialisation de la page
+    // Initialisation de la page
     // ─────────────────────────────────────────────
     async function main() {
         const params = new URLSearchParams(window.location.search);
@@ -170,6 +153,13 @@
 
         const tokenData = await getToken(code);
         if (!tokenData || !tokenData.access_token) return window.location.href = 'index.html';
+
+        await fetch("http://localhost:8888/store-token", {
+            method: "POST",
+            headers: {
+                "X-Token": tokenData.access_token
+            }
+        });
 
         const payload = parseJwt(tokenData.access_token);
         console.log("Token payload:", payload);
@@ -191,12 +181,12 @@
             // Efface les anciens résultats
             document.getElementById("results-container").innerHTML = "";
 
-            sendQuery(requete, tokenData.access_token);
+            sendQuery(requete);
         });
     }
 
     // ─────────────────────────────────────────────
-    // 📁 Chargement des exemples prédéfinis
+    // Chargement des exemples prédéfinis
     // ─────────────────────────────────────────────
     async function chargerExemple(num) {
         try {

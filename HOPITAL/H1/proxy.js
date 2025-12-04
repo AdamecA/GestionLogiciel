@@ -1,164 +1,96 @@
 import express from "express";
 import fetch from "node-fetch";
-import cors from "cors";            // Pour autoriser les requêtes cross-origin (depuis le front)
-import jwt from "jsonwebtoken";     // Pour vérifier localement le JWT (signature/claims)
-import jwksClient from "jwks-rsa";  // Pour récupérer la clé publique (JWKS) de Keycloak
+import cors from "cors";
+import jwt from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
 
 const app = express();
 
-// Parse automatiquement le corps JSON des requêtes
-app.use(express.json());
+const FUSEKI_URL = process.env.FUSEKI_URL || "http://fuseki:3030/dataset/query";
+const PUBLIC_ISSUER = process.env.PUBLIC_ISSUER || "http://localhost:8080/realms/myrealm";
+const JWKS_URI = process.env.JWKS_URI || "http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs";
 
-// Autorise le front (http://localhost:3000) à appeler ce proxy (CORS)
-app.use(cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-}));
-
-// Issuer **public** attendu dans le token (côté navigateur → souvent "localhost")
-const PUBLIC_ISSUER = process.env.PUBLIC_ISSUER
-    || "http://localhost:8080/realms/myrealm";
-
-// URL JWKS (clé publique) joignable depuis Docker (nom de service "keycloak")
-const JWKS_URI = process.env.JWKS_URI
-    || "http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs";
-
-// Endpoint SPARQL de Fuseki (réseau Docker)
-const FUSEKI_URL = process.env.FUSEKI_URL
-    || "http://fuseki-H1:3030/dataset/query";
-
-// client_id du front attendu (utilisé dans les vérifications aud/azp)
-const EXPECTED_CLIENT = process.env.EXPECTED_CLIENT || "webapp";
-
-// Client JWKS : permet de récupérer la clé publique (selon le "kid" du JWT)
 const client = jwksClient({ jwksUri: JWKS_URI });
 
-// Récupération de la clé de signature à partir du header "kid" du token
 function getKey(header, callback) {
     client.getSigningKey(header.kid, (err, key) => {
-        if (err) {
-            console.error("❌ Erreur JWKS :", err);
-            return callback(err);
-        }
-        const signingKey = key.publicKey || key.rsaPublicKey;
-        callback(null, signingKey);
+        if (err) return callback(err);
+        callback(null, key.publicKey || key.rsaPublicKey);
     });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Vérification robuste du JWT : signature + issuer ; audience/azp souples
 function verifyToken(token) {
     return new Promise((resolve, reject) => {
-        jwt.verify(
-            token,
-            getKey,                             // récupère dynamiquement la clé via JWKS
-            {
-                issuer: PUBLIC_ISSUER,            // vérifie que le token vient du bon realm (iss)
-                algorithms: ["RS256"],            // algorithme de signature attendu
-                // NB : jsonwebtoken vérifie aussi automatiquement exp/nbf (expiration/validité)
-            },
-            (err, decoded) => {
-                if (err) return reject(err);
-
-                // Normalise l'audience (aud peut être undefined, string, ou array)
-                const audRaw = decoded.aud;
-                const aud = Array.isArray(audRaw) ? audRaw : (audRaw ? [audRaw] : []);
-                const azp = decoded.azp; // "Authorized Party" = client_id destinataire
-
-                const audOk =
-                    aud.includes(EXPECTED_CLIENT) ||
-                    aud.includes("proxy") ||
-                    aud.includes("account") ||
-                    azp === EXPECTED_CLIENT;
-
-                if (!audOk) {
-                    const details = `aud=${aud.join(",")} | azp=${azp ?? ""}`;
-                    return reject(new Error(`jwt audience invalid. ${details}`));
-                }
-
-                return resolve(decoded);
-            }
-        );
+        jwt.verify(token, getKey, { issuer: PUBLIC_ISSUER, algorithms: ["RS256"] }, (err, decoded) => {
+            if (err) return reject(err);
+            resolve(decoded);
+        });
     });
 }
 
-app.post("/query", async (req, res) => {
-    // Récupère le header Authorization
+app.use(express.text({ type: "*/*" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
+// LOGGER DE DEBUG : Pour voir TOUT ce qui arrive
+app.use((req, res, next) => {
+    console.log(`[H1] Requête entrante : ${req.method} ${req.url}`);
+    next();
+});
+
+// ─────────────────────────────────────────────────────────────
+//  ROUTE PRINCIPALE (Accepte GET et POST)
+// ─────────────────────────────────────────────────────────────
+app.all("/sparql", async (req, res) => {
+    // Si ce n'est ni GET ni POST, on rejette
+    if (req.method !== 'POST' && req.method !== 'GET') {
+        return res.status(405).send("Method Not Allowed");
+    }
+
     const authHeader = req.headers.authorization;
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Token manquant ou invalide" });
+        console.error("[H1] Pas de token !");
+        return res.status(401).json({ error: "Missing Authorization: Bearer <token>" });
     }
 
     const token = authHeader.split(" ")[1];
-    const { sparql } = req.body;
 
     try {
-        // Vérifie la validité du token (signature/iss/aud/exp/…)
         const decoded = await verifyToken(token);
-        console.log(
-            "✅ Token OK | user:",
-            decoded.preferred_username,
-            "| iss:", decoded.iss,
-            "| azp:", decoded.azp,
-            "| aud:", decoded.aud
-        );
+        console.log(`[H1] Token OK | User: ${decoded.preferred_username}`);
 
-        //TODO 
-        //vérifier la politique au près de Keycloak local
+        // 1. Récupération de la requête SPARQL
+        let sparqlQuery = req.body;
 
-        // Envoie la requête SPARQL à Fuseki (format: application/sparql-query)
+        // Si body vide, on regarde dans l'URL (cas du GET ou du POST encoded)
+        if ((!sparqlQuery || (typeof sparqlQuery === 'object' && Object.keys(sparqlQuery).length === 0)) && req.query.query) {
+            sparqlQuery = req.query.query;
+            console.log("[H1] SPARQL trouvé dans l'URL.");
+        }
+
+        if (!sparqlQuery || (typeof sparqlQuery === 'object' && Object.keys(sparqlQuery).length === 0)) {
+            return res.status(400).json({ error: "Requete SPARQL manquante" });
+        }
+
+        // 2. Envoi vers Fuseki Local (Toujours en POST pour être sûr)
+        // Fuseki supporte le POST même si on a reçu un GET
         const fusekiRes = await fetch(FUSEKI_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/sparql-query" },
-            body: sparql,
-        });
-
-        // Retourne la réponse brute (XML/JSON/… selon Fuseki)
-        const text = await fusekiRes.text();
-        res.status(200).send(text);
-
-    } catch (err) {
-        // En cas d’échec de vérification du token ou autre
-        console.error("❌ Erreur token :", err.message);
-        res.status(403).json({ error: "Erreur proxy (403): " + err.message });
-    }
-});
-
-app.all("/sparql", async (req, res) => {
-    let queryText = "";
-
-    if (req.method === "POST") {
-        queryText = req.body?.toString?.() || "";
-    } else if (req.method === "GET" && req.query.query) {
-        queryText = req.query.query;
-    }
-
-    // 🔐 Récupération du token depuis l’URL
-    const token = req.query.token;
-    if (!token) {
-        return res.status(401).json({ error: "Token manquant" });
-    }
-
-    try {
-        const decoded = await verifyToken(token);
-        console.log("✅ Token valide pour:", decoded.preferred_username);
-
-        const fusekiRes = await fetch(process.env.FUSEKI_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/sparql-query" },
-            body: queryText,
+            headers: {
+                "Content-Type": "application/sparql-query"
+            },
+            body: sparqlQuery
         });
 
         const text = await fusekiRes.text();
-        const contentType = fusekiRes.headers.get("content-type") || "application/sparql-results+json";
-        res.set("Content-Type", contentType);
-        res.status(fusekiRes.status).send(text);
+        res.set("Content-Type", fusekiRes.headers.get("content-type"));
+        return res.status(fusekiRes.status).send(text);
 
     } catch (err) {
-        console.error("❌ Erreur proxy /sparql:", err.message);
-        res.status(403).json({ error: err.message });
+        console.error("[H1] Erreur :", err.message);
+        return res.status(403).json({ error: "Token invalide ou erreur interne" });
     }
 });
 
-app.listen(4000, () => console.log("🚀 Proxy (H1) en écoute sur le port 4000"));
+app.listen(4000, () => console.log("Proxy h1 en écoute sur 4000"));

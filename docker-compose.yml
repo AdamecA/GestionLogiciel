@@ -25,7 +25,7 @@ services:
     restart: always
     networks:
       - gestionlogiciel_default
-    
+  
   fuseki-fed:
     image: stain/jena-fuseki
     container_name: fuseki-fed
@@ -35,6 +35,21 @@ services:
       - ADMIN_PASSWORD=admin
       - FUSEKI_DATASET_1=dataset
       - FUSEKI_DATASET_1_TYPE=mem
+      #- JAVA_OPTIONS=-Dhttp.proxyHost=forward-proxy -Dhttp.proxyPort=8888 -Dhttp.nonProxyHosts=localhost|127.0.0.1|fuseki-fed
+      - JVM_ARGS=-Dhttp.proxyHost=forward-proxy -Dhttp.proxyPort=8888 -Dhttp.nonProxyHosts="localhost|127.0.0.1|fuseki-fed"
+      # configuré le conteneur Fuseki avec des arguments JVM standards
+      # pour dire à Fuseki : "Pour toutes tes sorties vers Internet ou les hôpitaux, ne sors pas directement, 
+      # passe obligatoirement par le guichet 'forward-proxy
+    networks:
+      - gestionlogiciel_default
+  
+  forward-proxy:
+    build:
+      context: ./forward-proxy
+      dockerfile: Dockerfile
+    container_name: forward-proxy
+    ports:
+      - "8888:8888"
     networks:
       - gestionlogiciel_default
 

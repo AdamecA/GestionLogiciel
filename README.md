@@ -1,11 +1,22 @@
-# 🧩 Projet Hôpital – Docker Setup
-## 📘 Description
-Ce projet déploie une architecture distribuée pour la gestion de données hospitalières composée de :
+# Projet Hôpital – Docker Setup
+## Description
+Ce projet déploie une architecture distribuée pour la gestion de données hospitalières fédérées et sécurisées. L'architecture repose sur :
 
-- 2 serveurs Apache Jena Fuseki (H1 et H2) - Bases de données RDF/SPARQL
-- 1 serveur Keycloak - Gestion de l'authentification et des autorisations
-- 1 application web - Interface utilisateur (index.html / main.html) servie via Nginx
+- Architecture Fédérée : Un serveur Fuseki central interroge plusieurs hôpitaux via des requêtes SERVICE.
 
+- Sécurité (Proxy Forward & Reverse) :
+
+    - Un Forward Proxy (Racine) : Intercepte les requêtes sortantes de Fuseki pour injecter le token d'authentification.
+
+    - Des Reverse Proxies (Hôpitaux) : Protègent chaque hôpital en vérifiant la validité du token JWT via Keycloak.
+
+- Composants :
+
+  - 2 serveurs Apache Jena Fuseki (H1 et H2) - Bases de données RDF/SPARQL locales.
+
+  - 1 serveur Keycloak - Gestion de l'authentification (SSO) et des autorisations.
+
+  - 1 application web - Interface utilisateur (index.html / main.html) servie via Nginx.
 
 ## 👥 Auteurs
 
@@ -18,7 +29,7 @@ Ce projet déploie une architecture distribuée pour la gestion de données hosp
 **TAII Wiame**
 
 
-## 📋 Prérequis
+## Prérequis
  Avant de commencer, assurez-vous d'avoir installé :
 
 - Docker (version 20.10 ou supérieure)
@@ -30,26 +41,22 @@ Vérification de l'installation
 docker --version
 docker-compose --version
 ```
-## 🚀 Démarrage rapide
-### 1️⃣ Cloner le projet
+## Démarrage rapide
+### Cloner le projet
 ```bash
 git clone <url-du-repo>
 cd GestionLogiciel
 ```
-### 2️⃣ Lancer tous les services
+### Lancer tous les services
 Depuis le dossier racine du projet :
 ```bash
 chmod +x start.sh
 ./start.sh
 ```
 Cette commande démarre tous les conteneurs en mode détaché (arrière-plan).
-### 3️⃣ Vérifier le statut des services
+### Vérifier le statut des services
 ```bash
 docker ps
-```
-### charger les données RDF dans Fuseki H1
-```bash
-chmod +x HOPITAL/H1/loader.sh
 ```
 
 ## 🛑 Arrêt des services
@@ -60,56 +67,64 @@ chmod +x stop.sh
 ./stop.sh
 ```
 
-> **⚠️ Attention : Cette commande supprimera toutes les données pers**
+> **⚠️ Attention : Cette commande supprimera toutes les données persistantes**
 
-## 🌐 Accès aux services
-Une fois les services démarrés, vous pouvez y accéder via :
+## Accès aux services
+Une fois les services démarrés, voici les points d'accès :
 
-**Proxy H1 :**
-- URL : http://localhost:4000
+Infrastructure Centrale
+- Application Web (Frontend) : http://localhost:3000
 
-**Service : Fuseki H1**
-- URL : http://localhost:3030
-- Identifiants : admin / admin
+        Identifiants Test : Alice / Alice ou Bob / Bob
 
-**Service : Fuseki H2**
-- URL : http://localhost:3031
-- Identifiants : admin / admin
+- Keycloak (Auth) : http://localhost:8080
 
-**Service : Keycloak**
-- URL : http://localhost:8080
-- Identifiants : admin / admin
+      Admin : admin / admin
 
-**Service : Application Web**
-- URL : http://localhost:3000
-- Identifiants : Alice / Alice
+- Fuseki Fédérateur : http://localhost:3030
+
+- Forward Proxy (Intercepteur Token) : http://localhost:8888
+
+Hôpital 1 (H1)
+
+- Proxy Sécurisé (Entrée) : http://localhost:4000
+
+- Base de données (Fuseki H1) : http://localhost:3031
+
+Hôpital 2 (H2)
+
+- Proxy Sécurisé (Entrée) : http://localhost:4001
+
+- Base de données (Fuseki H2) : http://localhost:3032
 
 ## 💡 Utilisation de l'application
-### Étape 1 : Accéder à l'application
+
+Étape 1 : Accéder à l'application
+
 Ouvrez votre navigateur et accédez à : http://localhost:3000
-### Étape 2 : Se connecter
 
-Cliquez sur le bouton "Se connecter"
-Vous serez automatiquement redirigé vers la page d'authentification Keycloak
+Étape 2 : Authentification
 
-### Étape 3 : S'authentifier avec Keycloak
-Sur la page de connexion Keycloak, utilisez les identifiants de test :
+    - Cliquez sur le bouton "Se connecter".
 
-Nom d'utilisateur : Alice
-Mot de passe : Alice
+    - Vous serez redirigé vers Keycloak.
 
-### Étape 4 : Exécuter une requête SPARQL
-Une fois connecté, vous avez deux options :
-### Option A : Utiliser un exemple prédéfini
+    - Connectez-vous avec Alice / Alice (ou un autre utilisateur configuré).
 
-Cliquez sur l'un des boutons d'exemple disponibles
-La requête SPARQL sera automatiquement remplie dans le champ de texte
+    - Le token JWT est automatiquement récupéré et envoyé au Forward Proxy.
 
-### Option B : Saisir votre propre requête
+Étape 3 : Exécuter une requête SPARQL Fédérée
 
-Tapez ou collez votre requête SPARQL dans le champ prévu à cet effet
+Une fois connecté, vous pouvez interroger les données des hôpitaux via le fédérateur.
 
-### Étape 5 : Soumettre la requête
+Ètape 4 : Soumettre
 
-Cliquez sur le bouton "Submit" pour envoyer la requête
-Les résultats s'afficheront dans l'interface
+    - Cliquez sur "Submit". Le Fuseki central va :
+
+    - Envoyer la requête au Forward Proxy.
+
+    - Le Proxy ajoute le token.
+
+    - La requête arrive aux Proxies des hôpitaux (H1/H2).
+
+    - Les Proxies Hôpitaux valident le token et renvoient les données.
