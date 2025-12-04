@@ -25,7 +25,7 @@ services:
     restart: always
     networks:
       - gestionlogiciel_default
-    
+
   fuseki-fed:
     image: stain/jena-fuseki
     container_name: fuseki-fed
@@ -37,6 +37,16 @@ services:
       - FUSEKI_DATASET_1_TYPE=mem
     networks:
       - gestionlogiciel_default
+
+  fedup:
+    image: aadamec/fedup-capstone:v9
+    container_name: fedup-server
+    ports:
+      - "3330:3330"
+    restart: always
+    networks:
+      - gestionlogiciel_default
+
 
 networks:
   gestionlogiciel_default:

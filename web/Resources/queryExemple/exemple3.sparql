@@ -2,10 +2,8 @@ PREFIX ex: <http://example.org/schema#>
 PREFIX res: <http://example.org/resource/>
 
 SELECT ?p ?age ?aneu WHERE {
-    SERVICE <http://proxy1:4000/sparql> {
-      ?p a ex:Patient ;
-         ex:partOf res:study_A ;
-         ex:hasAge ?age ;
-         ex:hasAneurysm ?aneu .
-    }
+  ?p a ex:Patient ;
+     ex:partOf res:study_A ;
+     ex:hasAge ?age ;
+     ex:hasAneurysm ?aneu .
 }

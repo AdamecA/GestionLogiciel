@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
     container_name: proxy2
     ports:
-      - "4001:4000"
+      - "4001:4001"
     environment:
       - PUBLIC_ISSUER=http://localhost:8080/realms/myrealm
       - JWKS_URI=http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs
