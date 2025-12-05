@@ -43,10 +43,12 @@ const server = http.createServer((clientReq, clientRes) => {
     // 2. LOGIQUE D'INTERCEPTION (Venant de Fuseki)
     // ─────────────────────────────────────────────────────────────
     console.log(` [ForwardProxy] Interception requête vers : ${reqUrl}`);
-
+    let cleanedUrl = reqUrl; // Déclaration unique, en dehors du try
     try {
-        const targetUrl = new URL(reqUrl);
-
+        cleanedUrl = reqUrl.startsWith('/') ? reqUrl.substring(1) : reqUrl;
+        //const decodedUrl = decodeURIComponent(cleanedUrl);
+        // 3. Analyse l'URL
+        const targetUrl = new URL(cleanedUrl);
         // Configuration de la requête sortante
         const options = {
             hostname: targetUrl.hostname,
@@ -55,7 +57,6 @@ const server = http.createServer((clientReq, clientRes) => {
             method: clientReq.method,
             headers: { ...clientReq.headers }
         };
-
         // INJECTION DU TOKEN
         if (currentToken) {
             options.headers['Authorization'] = `Bearer ${currentToken}`;

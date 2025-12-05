@@ -70,27 +70,36 @@
     // ─────────────────────────────────────────────
     // Envoi de la requête au Fuseki fédérateur
     // ─────────────────────────────────────────────
-    async function sendQuery(query) {
-        const fusekiGlobalUrl = "http://localhost:3030/dataset/query";
+    async function sendQuery(query, token) {
+
+        const fedupUrl = "http://localhost:3330/tdb2summary/sparql";
+
+        const params = new URLSearchParams();
+        params.append("query", query);
+        params.append("runQuery", "true");
 
         try {
-            const response = await fetch(fusekiGlobalUrl, {
+            const response = await fetch(fedupUrl, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/sparql-query"
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": `Bearer ${token}`
                 },
-                body: query
+                body: params.toString()
             });
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`Erreur Fuseki Global (${response.status}) — ${errText}`);
+                throw new Error(`Erreur FedUP (${response.status}) — ${errText}`);
             }
 
-            const text = await response.text();
-            afficherResultats([{ endpoint: fusekiGlobalUrl, result: text }]);
+            const json = await response.json();
+            console.log("Réponse FedUP :", json);
+
+            afficherResultats([{ endpoint: fedupUrl, result: json }]);
+
         } catch (err) {
-            console.error("Erreur sendQuery :", err);
+            console.error("❌ Erreur sendQuery :", err);
             alert(err.message);
         }
     }

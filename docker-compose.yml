@@ -42,6 +42,18 @@ services:
       # passe obligatoirement par le guichet 'forward-proxy
     networks:
       - gestionlogiciel_default
+
+  fedup:
+    image: aadamec/fedup-capstone:v10
+    container_name: fedup-server
+    ports:
+      - "3330:3330"
+    restart: always
+    networks:
+      - gestionlogiciel_default
+    #environment:
+    #  - JAVA_OPTS=-Dhttp.proxyHost=forward-proxy -Dhttp.proxyPort=8888 -Dhttp.nonProxyHosts="localhost|127.0.0.1|fuseki-fed"
+
   
   forward-proxy:
     build:
@@ -52,6 +64,8 @@ services:
       - "8888:8888"
     networks:
       - gestionlogiciel_default
+    volumes:
+      - ./forward-proxy/forward-proxy.js:/app/forward-proxy.js
 
 networks:
   gestionlogiciel_default:

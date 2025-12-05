@@ -75,12 +75,17 @@ app.all("/sparql", async (req, res) => {
 
         // 2. Envoi vers Fuseki Local (Toujours en POST pour être sûr)
         // Fuseki supporte le POST même si on a reçu un GET
+        const formBody = new URLSearchParams({
+            query: sparqlQuery // Encapsule la requête dans un paramètre 'query'
+        });
+
         const fusekiRes = await fetch(FUSEKI_URL, {
             method: "POST",
             headers: {
-                "Content-Type": "application/sparql-query"
+                // Indique à Fuseki que le corps est une chaîne de paramètres clé/valeur
+                "Content-Type": "application/x-www-form-urlencoded"
             },
-            body: sparqlQuery
+            body: formBody.toString() // Envoie la chaîne 'query=VOTRE_REQUETE_ENCODEE'
         });
 
         const text = await fusekiRes.text();
@@ -93,4 +98,4 @@ app.all("/sparql", async (req, res) => {
     }
 });
 
-app.listen(4000, () => console.log("Proxy h1 en écoute sur 4000"));
+app.listen(4000, () => console.log("Proxy h1 en écoute sur 4000 hey"));

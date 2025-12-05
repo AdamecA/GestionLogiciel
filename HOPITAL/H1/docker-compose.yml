@@ -18,6 +18,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: proxy1
+    volumes:
+      - ./proxy.js:/app/proxy.js
     ports:
       - "4000:4000"
     environment:
