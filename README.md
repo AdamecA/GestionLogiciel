@@ -2,13 +2,13 @@
 ## Description
 Ce projet déploie une architecture distribuée pour la gestion de données hospitalières fédérées et sécurisées. L'architecture repose sur :
 
-- Architecture Fédérée : Un serveur Fuseki central interroge plusieurs hôpitaux via des requêtes SERVICE.
+- Architecture Fédérée : Un serveur Fedup central interroge plusieurs hôpitaux.
 
 - Sécurité (Proxy Forward & Reverse) :
 
     - Un Forward Proxy (Racine) : Intercepte les requêtes sortantes de Fuseki pour injecter le token d'authentification.
 
-    - Des Reverse Proxies (Hôpitaux) : Protègent chaque hôpital en vérifiant la validité du token JWT via Keycloak.
+    - Des Reverse Proxy (Hôpitaux) : Protègent chaque hôpital en vérifiant la validité du token JWT via Keycloak.
 
 - Composants :
 
@@ -81,7 +81,7 @@ Infrastructure Centrale
 
       Admin : admin / admin
 
-- Fuseki Fédérateur : http://localhost:3030
+- Fedup : http://localhost:3330
 
 - Forward Proxy (Intercepteur Token) : http://localhost:8888
 
@@ -113,7 +113,7 @@ Ouvrez votre navigateur et accédez à : http://localhost:3000
 
     - Le token JWT est automatiquement récupéré et envoyé au Forward Proxy.
 
-Étape 3 : Exécuter une requête SPARQL Fédérée
+Étape 3 : Exécuter une requête SPARQL Fédérée (sans clause service)
 
 Une fois connecté, vous pouvez interroger les données des hôpitaux via le fédérateur.
 

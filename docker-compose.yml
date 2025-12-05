@@ -51,21 +51,23 @@ services:
     restart: always
     networks:
       - gestionlogiciel_default
-    #environment:
-    #  - JAVA_OPTS=-Dhttp.proxyHost=forward-proxy -Dhttp.proxyPort=8888 -Dhttp.nonProxyHosts="localhost|127.0.0.1|fuseki-fed"
 
   
+
   forward-proxy:
     build:
-      context: ./forward-proxy
+      context: ./Proxy
       dockerfile: Dockerfile
     container_name: forward-proxy
     ports:
       - "8888:8888"
+    environment:
+      - PORT=8888
+      - PROXY_MODE=FORWARD
+    volumes:
+      - ./Proxy/proxy.js:/app/proxy.js
     networks:
       - gestionlogiciel_default
-    volumes:
-      - ./forward-proxy/forward-proxy.js:/app/forward-proxy.js
 
 networks:
   gestionlogiciel_default:

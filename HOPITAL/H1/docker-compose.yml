@@ -13,22 +13,26 @@ services:
     networks:
       - hospital-net
 
+
   proxy:
     build:
-      context: .
+      context: ../../Proxy
       dockerfile: Dockerfile
     container_name: proxy1
-    volumes:
-      - ./proxy.js:/app/proxy.js
     ports:
       - "4000:4000"
     environment:
+      - PORT=4000
+      - PROXY_MODE=HOSPITAL
+      # Variables spécifiques au mode HOSPITAL
       - PUBLIC_ISSUER=http://localhost:8080/realms/myrealm
       - JWKS_URI=http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs
-      - FUSEKI_URL=http://fuseki:3030/dataset/query   # <-- utilise le nom de service "fuseki"
-      - EXPECTED_CLIENT=webapp
+      - FUSEKI_URL=http://fuseki:3030/dataset/query
+    volumes:
+      - ../../Proxy/proxy.js:/app/proxy.js
     depends_on:
       - fuseki
+
     networks:
       - hospital-net
       - gestionlogiciel_default
