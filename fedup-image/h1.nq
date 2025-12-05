@@ -1,0 +1,12 @@
+<http://example.org/resource/study_A> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/schema#Study> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/schema#Patient> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient1> <http://example.org/schema#partOf> <http://example.org/resource/study_A> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient1> <http://example.org/schema#hasImage> <http://example.org/resource/image1> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient1> <http://example.org/schema#hasMutation> <http://example.org/resource/gen_mut1> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient1> <http://example.org/schema#hasAge> "65"^^<http://www.w3.org/2001/XMLSchema#integer> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient1> <http://example.org/schema#hasAneurysm> "false"^^<http://www.w3.org/2001/XMLSchema#boolean> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/schema#Patient> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient2> <http://example.org/schema#partOf> <http://example.org/resource/study_A> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient2> <http://example.org/schema#hasImage> <http://example.org/resource/image1> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient2> <http://example.org/schema#hasAge> "40"^^<http://www.w3.org/2001/XMLSchema#integer> <http://proxy1:4000/sparql> .
+<http://example.org/resource/patient2> <http://example.org/schema#hasAneurysm> "true"^^<http://www.w3.org/2001/XMLSchema#boolean> <http://proxy1:4000/sparql> .
