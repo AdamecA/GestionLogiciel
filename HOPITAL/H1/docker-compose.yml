@@ -1,4 +1,20 @@
 services:
+  keycloak-h1:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak-h1
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ../../Data/config/hospital1Keycloak:/opt/keycloak/data/import
+    ports:
+      - "8081:8080"
+    restart: always
+    networks:
+      - hospital-net
+      - gestionlogiciel_default
+
   fuseki:
     image: stain/jena-fuseki
     platform: linux/amd64
@@ -26,12 +42,18 @@ services:
       - PROXY_MODE=HOSPITAL
       # Variables spécifiques au mode HOSPITAL
       - PUBLIC_ISSUER=http://localhost:8080/realms/myrealm
-      - JWKS_URI=http://keycloak:8080/realms/myrealm/protocol/openid-connect/certs
+      - JWKS_URI=http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/certs
       - FUSEKI_URL=http://fuseki:3030/dataset/query
+      # Variables pour le Keycloak local (token exchange)
+      - LOCAL_KEYCLOAK_URL=http://keycloak-h1:8080
+      - LOCAL_REALM=hospital1-realm
+      - LOCAL_CLIENT_ID=hospital-proxy
+      - LOCAL_CLIENT_SECRET=hospital1-secret
     volumes:
       - ../../Proxy/proxy.js:/app/proxy.js
     depends_on:
       - fuseki
+      - keycloak-h1
 
     networks:
       - hospital-net

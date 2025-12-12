@@ -21,6 +21,12 @@ const FUSEKI_URL = process.env.FUSEKI_URL; // URL complète de Fuseki local
 const PUBLIC_ISSUER = process.env.PUBLIC_ISSUER;
 const JWKS_URI = process.env.JWKS_URI;
 
+// Configuration pour le Keycloak local (token exchange)
+const LOCAL_KEYCLOAK_URL = process.env.LOCAL_KEYCLOAK_URL;
+const LOCAL_REALM = process.env.LOCAL_REALM;
+const LOCAL_CLIENT_ID = process.env.LOCAL_CLIENT_ID;
+const LOCAL_CLIENT_SECRET = process.env.LOCAL_CLIENT_SECRET;
+
 // ─────────────────────────────────────────────────────────────
 // CONFIGURATION POUR LE MODE FORWARD
 // ─────────────────────────────────────────────────────────────
@@ -56,6 +62,119 @@ function verifyToken(token) {
             resolve(decoded);
         });
     });
+}
+
+// ─────────────────────────────────────────────────────────────
+// FONCTION D'ÉCHANGE DE TOKEN (Token Translation)
+// ─────────────────────────────────────────────────────────────
+async function exchangeTokenForLocal(centralToken) {
+    try {
+        // 1. Décoder le token central pour extraire le username
+        const decoded = jwt.decode(centralToken);
+        if (!decoded || !decoded.preferred_username) {
+            throw new Error('Unable to extract username from central token');
+        }
+
+        const username = decoded.preferred_username;
+        console.log(`🔄 [TokenExchange] Exchanging token for user: ${username}`);
+
+        // 2. Obtenir un token du Keycloak local en utilisant username=password
+        const tokenUrl = `${LOCAL_KEYCLOAK_URL}/realms/${LOCAL_REALM}/protocol/openid-connect/token`;
+
+        const params = new URLSearchParams();
+        params.append('grant_type', 'password');
+        params.append('client_id', LOCAL_CLIENT_ID);
+        params.append('client_secret', LOCAL_CLIENT_SECRET);
+        params.append('username', username);
+        params.append('password', username); // username = password (simulation de fédération)
+
+        const response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params.toString()
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Local Keycloak token exchange failed: ${response.status} - ${errorText}`);
+        }
+
+        const tokenData = await response.json();
+        console.log(`✅ [TokenExchange] Local token obtained for ${username}`);
+
+        return tokenData.access_token;
+
+    } catch (err) {
+        console.error(`❌ [TokenExchange] Error: ${err.message}`);
+        throw err;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FONCTION DE VÉRIFICATION DES PERMISSIONS VIA KEYCLOAK
+// ─────────────────────────────────────────────────────────────
+async function checkPermission(localToken, resourceName, scope) {
+    try {
+        console.log(`🔐 [Authorization] Checking permission for resource: ${resourceName}, scope: ${scope}`);
+
+        // Appel à l'API Keycloak Token Endpoint pour obtenir un RPT (Requesting Party Token)
+        const tokenUrl = `${LOCAL_KEYCLOAK_URL}/realms/${LOCAL_REALM}/protocol/openid-connect/token`;
+
+        const params = new URLSearchParams();
+        params.append('grant_type', 'urn:ietf:params:oauth:grant-type:uma-ticket');
+        params.append('audience', LOCAL_CLIENT_ID);
+        params.append('permission', `${resourceName}#${scope}`);
+
+        const response = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': `Bearer ${localToken}`
+            },
+            body: params.toString()
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`✅ [Authorization] Permission GRANTED for ${resourceName}#${scope}`);
+            return { granted: true, rpt: data.access_token };
+        } else if (response.status === 403 || response.status === 401) {
+            console.log(`❌ [Authorization] Permission DENIED for ${resourceName}#${scope}`);
+            return { granted: false, reason: 'Access denied by policy' };
+        } else {
+            const errorText = await response.text();
+            console.error(`⚠️ [Authorization] Error checking permission: ${response.status} - ${errorText}`);
+            return { granted: false, reason: `Authorization service error: ${response.status}` };
+        }
+
+    } catch (err) {
+        console.error(`❌ [Authorization] Exception: ${err.message}`);
+        return { granted: false, reason: err.message };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FONCTION POUR EXTRAIRE LA STUDY D'UNE REQUÊTE SPARQL
+// ─────────────────────────────────────────────────────────────
+function extractStudyFromSPARQL(sparqlQuery) {
+    try {
+        const query = sparqlQuery.toLowerCase();
+
+        // Cherche des patterns comme "res:study_A" ou "study_A" dans la requête
+        if (query.includes('study_a') || query.includes('res:study_a')) {
+            return 'study_A';
+        } else if (query.includes('study_b') || query.includes('res:study_b')) {
+            return 'study_B';
+        }
+
+        // Si aucune étude spécifique n'est mentionnée, retourne null (accès général)
+        return null;
+    } catch (err) {
+        console.error(`Error parsing SPARQL: ${err.message}`);
+        return null;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -171,12 +290,24 @@ function startHospitalProxy() {
             return res.status(401).json({ error: "Missing Authorization: Bearer <token>" });
         }
 
-        const token = authHeader.split(" ")[1];
+        const centralToken = authHeader.split(" ")[1];
 
         try {
-            // VÉRIFICATION DU TOKEN
-            const decoded = await verifyToken(token);
-            console.log(`✅ [HOSPITAL] Token OK | User: ${decoded.preferred_username}`);
+            // ÉTAPE 1: VÉRIFICATION DU TOKEN CENTRAL
+            const decoded = await verifyToken(centralToken);
+            console.log(`✅ [HOSPITAL] Central token verified | User: ${decoded.preferred_username}`);
+
+            // ÉTAPE 2: ÉCHANGE DE TOKEN (Token Translation)
+            // Obtenir un token du Keycloak local basé sur l'utilisateur authentifié centralement
+            let localToken;
+            if (LOCAL_KEYCLOAK_URL && LOCAL_REALM && LOCAL_CLIENT_ID && LOCAL_CLIENT_SECRET) {
+                console.log(`🔄 [HOSPITAL] Performing token exchange...`);
+                localToken = await exchangeTokenForLocal(centralToken);
+                console.log(`✅ [HOSPITAL] Token exchange successful - using local token`);
+            } else {
+                console.warn(`⚠️ [HOSPITAL] No local Keycloak configured - using central token`);
+                localToken = centralToken;
+            }
 
             // RÉCUPÉRATION DE LA REQUÊTE SPARQL
             let sparqlQuery = req.body;
@@ -188,7 +319,32 @@ function startHospitalProxy() {
                 return res.status(400).json({ error: "Requete SPARQL manquante" });
             }
 
-            // ENVOI VERS FUSEKI LOCAL
+            // ÉTAPE 3: VÉRIFICATION DES PERMISSIONS VIA KEYCLOAK
+            // Déterminer quelle ressource l'utilisateur essaie d'accéder
+            const studyRequested = extractStudyFromSPARQL(sparqlQuery);
+            let resourceToCheck = 'patient_data'; // Par défaut
+
+            if (studyRequested === 'study_A') {
+                resourceToCheck = 'study_A';
+            } else if (studyRequested === 'study_B') {
+                resourceToCheck = 'study_B';
+            }
+
+            // Vérifier la permission avec Keycloak
+            const permissionResult = await checkPermission(localToken, resourceToCheck, 'read');
+
+            if (!permissionResult.granted) {
+                console.error(`🚫 [HOSPITAL] Access DENIED for user ${decoded.preferred_username} to resource ${resourceToCheck}`);
+                return res.status(403).json({
+                    error: "Access Denied",
+                    message: `You do not have permission to access ${resourceToCheck}`,
+                    reason: permissionResult.reason
+                });
+            }
+
+            console.log(`✅ [HOSPITAL] Access GRANTED for user ${decoded.preferred_username} to resource ${resourceToCheck}`);
+
+            // ÉTAPE 4: ENVOI VERS FUSEKI LOCAL (avec le token local)
             const formBody = new URLSearchParams({
                 query: sparqlQuery
             });
@@ -196,7 +352,8 @@ function startHospitalProxy() {
             const fusekiRes = await fetch(FUSEKI_URL, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": `Bearer ${localToken}` // Token local pour logs/audit
                 },
                 body: formBody.toString()
             });
@@ -208,7 +365,7 @@ function startHospitalProxy() {
         } catch (err) {
             console.error("❌ [HOSPITAL] Erreur :", err.message);
             // 403 Forbidden est plus approprié qu'une erreur interne pour un token invalide.
-            return res.status(403).json({ error: "Token invalide ou erreur interne" });
+            return res.status(403).json({ error: "Token invalide ou erreur interne", details: err.message });
         }
     });
 

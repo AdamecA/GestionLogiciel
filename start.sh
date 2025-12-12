@@ -16,5 +16,12 @@ docker-compose -f ./HOPITAL/H1/docker-compose.yml up -d
 echo "🩺 Lancement H2..."
 docker-compose -f ./HOPITAL/H2/docker-compose.yml up -d
 
-
 echo "✅ Tous les conteneurs sont démarrés."
+
+# Configuration automatique des Authorization Services
+echo ""
+echo "🔧 Configuration des Authorization Services Keycloak..."
+./scripts/configure-keycloak-authz.sh
+
+echo ""
+echo "✅ Système complètement démarré et configuré!"

@@ -75,11 +75,12 @@ Une fois les services démarrés, voici les points d'accès :
 Infrastructure Centrale
 - Application Web (Frontend) : http://localhost:3000
 
-        Identifiants Test : Alice / Alice ou Bob / Bob
+        Identifiants Test : alice / alice, bob / bob, carol / carol, etc.
 
-- Keycloak (Auth) : http://localhost:8080
+- Keycloak Central (Auth Principale) : http://localhost:8080
 
       Admin : admin / admin
+      Realm : myrealm
 
 - Fedup : http://localhost:3330
 
@@ -87,11 +88,21 @@ Infrastructure Centrale
 
 Hôpital 1 (H1)
 
+- Keycloak H1 (Auth Locale) : http://localhost:8081
+
+      Admin : admin / admin
+      Realm : hospital1-realm
+
 - Proxy Sécurisé (Entrée) : http://localhost:4000
 
 - Base de données (Fuseki H1) : http://localhost:3031
 
 Hôpital 2 (H2)
+
+- Keycloak H2 (Auth Locale) : http://localhost:8082
+
+      Admin : admin / admin
+      Realm : hospital2-realm
 
 - Proxy Sécurisé (Entrée) : http://localhost:4001
 
@@ -119,12 +130,43 @@ Une fois connecté, vous pouvez interroger les données des hôpitaux via le fé
 
 Ètape 4 : Soumettre
 
-    - Cliquez sur "Submit". Le Fuseki central va :
+    - Cliquez sur "Submit". Le flux d'authentification fédéré se déclenche :
 
-    - Envoyer la requête au Forward Proxy.
+    1. FedUP envoie la requête au Forward Proxy
 
-    - Le Proxy ajoute le token.
+    2. Le Forward Proxy injecte le token JWT du Keycloak Central
 
-    - La requête arrive aux Proxies des hôpitaux (H1/H2).
+    3. La requête arrive aux Proxies des hôpitaux (H1/H2)
 
-    - Les Proxies Hôpitaux valident le token et renvoient les données.
+    4. **Échange de Token (Token Translation)** :
+       - Le Proxy Hôpital vérifie d'abord le token Central
+       - Extrait le username (ex: "alice")
+       - Demande un token au Keycloak Local de l'hôpital
+       - Utilise username=password pour simuler la fédération
+       - Obtient un token local avec les politiques spécifiques de l'hôpital
+
+    5. Le Proxy Hôpital transmet la requête à Fuseki avec le token local
+
+    6. Les données sont retournées à l'utilisateur
+
+## 🔐 Architecture d'Authentification Multi-Realm
+
+### Concept : Simulation de Fédération d'Identité
+
+Le projet utilise **3 Keycloaks avec 3 realms différents** :
+
+1. **Keycloak Central** (`myrealm`) : Authentification initiale des utilisateurs
+2. **Keycloak Hospital 1** (`hospital1-realm`) : Politiques et rôles locaux de H1
+3. **Keycloak Hospital 2** (`hospital2-realm`) : Politiques et rôles locaux de H2
+
+### Token Translation Pattern
+
+Au lieu d'une vraie fédération OAuth (Identity Brokering), nous simulons le processus :
+
+- **Utilisateurs répliqués** : Les mêmes utilisateurs existent dans les 3 Keycloaks
+- **Convention username=password** : Simplifie l'échange de tokens (ex: alice/alice)
+- **Token Exchange** : Le proxy hôpital traduit le token central en token local
+- **Avantages** :
+  - Chaque hôpital garde son autonomie (ses propres rôles/politiques)
+  - Démontre les concepts de fédération sans la complexité technique
+  - Facile à étendre vers une vraie fédération OAuth plus tard

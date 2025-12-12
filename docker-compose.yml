@@ -11,9 +11,9 @@ services:
     networks:
       - gestionlogiciel_default
 
-  keycloak:
+  keycloak-central:
     image: quay.io/keycloak/keycloak:latest
-    container_name: keycloak
+    container_name: keycloak-central
     command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: admin
