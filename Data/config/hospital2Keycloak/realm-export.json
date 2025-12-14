@@ -4,15 +4,9 @@
   "enabled": true,
   "roles": {
     "realm": [
-      { "name": "admin" },
-      { "name": "user" },
-      { "name": "manager" },
-      { "name": "developer" },
-      { "name": "guest" },
-      { "name": "hospital-staff" },
-      { "name": "doctor" },
-      { "name": "nurse" },
-      { "name": "researcher" }
+      { "name": "admin", "description": "Full administrative access to all resources" },
+      { "name": "study_A_researcher", "description": "Can access study_A data" },
+      { "name": "study_B_researcher", "description": "Can access study_B data" }
     ]
   },
   "clients": [
@@ -63,12 +57,31 @@
             "uris": ["/patient/*"],
             "scopes": [
               {"name": "read"},
-              {"name": "read_full"},
-              {"name": "read_anonymized"}
+              {"name": "write"}
             ]
           }
         ],
         "policies": [
+          {
+            "name": "Study A Researcher Policy",
+            "description": "Policy for study_A researchers",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"study_A_researcher\",\"required\":true}]"
+            }
+          },
+          {
+            "name": "Study B Researcher Policy",
+            "description": "Policy for study_B researchers",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"study_B_researcher\",\"required\":true}]"
+            }
+          },
           {
             "name": "Admin Policy",
             "description": "Policy for administrators",
@@ -82,9 +95,7 @@
         ],
         "scopes": [
           {"name": "read"},
-          {"name": "write"},
-          {"name": "read_full"},
-          {"name": "read_anonymized"}
+          {"name": "write"}
         ]
       }
     }
@@ -104,12 +115,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["admin", "user", "doctor", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_A", "study_B"],
-        "clearance_level": ["high"],
-        "department": ["cardiology"]
-      },
+      "realmRoles": ["study_A_researcher"],
       "requiredActions": []
     },
     {
@@ -126,12 +132,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_B"],
-        "clearance_level": ["medium"],
-        "department": ["neurology"]
-      },
+      "realmRoles": ["study_B_researcher"],
       "requiredActions": []
     },
     {
@@ -148,12 +149,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["manager", "hospital-staff", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_A"],
-        "clearance_level": ["high"],
-        "department": ["cardiology"]
-      },
+      "realmRoles": ["study_A_researcher", "study_B_researcher"],
       "requiredActions": []
     },
     {
@@ -170,142 +166,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["developer", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_A", "study_B"],
-        "clearance_level": ["low"],
-        "department": ["it"]
-      },
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "eve",
-      "firstName": "Eve",
-      "lastName": "Evans",
-      "email": "eve@hospital2.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "eve",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["guest"],
-      "attributes": {
-        "allowed_studies": [],
-        "clearance_level": ["low"]
-      },
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "frank",
-      "firstName": "Frank",
-      "lastName": "Foster",
-      "email": "frank@hospital2.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "frank",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["user", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_B"],
-        "clearance_level": ["medium"],
-        "department": ["neurology"]
-      },
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "grace",
-      "firstName": "Grace",
-      "lastName": "Green",
-      "email": "grace@hospital2.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "grace",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["manager", "developer", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_A", "study_B"],
-        "clearance_level": ["high"],
-        "department": ["management"]
-      },
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "heidi",
-      "firstName": "Heidi",
-      "lastName": "Hunt",
-      "email": "heidi@hospital2.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "heidi",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["guest"],
-      "attributes": {
-        "allowed_studies": [],
-        "clearance_level": ["low"]
-      },
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "ivan",
-      "firstName": "Ivan",
-      "lastName": "Ivers",
-      "email": "ivan@hospital2.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "ivan",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["developer", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_A", "study_B"],
-        "clearance_level": ["medium"],
-        "department": ["it"]
-      },
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "judy",
-      "firstName": "Judy",
-      "lastName": "Jones",
-      "email": "judy@hospital2.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "judy",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["user", "nurse", "researcher"],
-      "attributes": {
-        "allowed_studies": ["study_B"],
-        "clearance_level": ["medium"],
-        "department": ["neurology"]
-      },
+      "realmRoles": ["admin"],
       "requiredActions": []
     }
   ]

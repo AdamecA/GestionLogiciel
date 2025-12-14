@@ -239,12 +239,10 @@ echo "    • read: $READ_SCOPE_ID"
 echo "  🔍 Récupération des IDs des policies..."
 STUDY_A_POLICY_ID=$(get_policy_id "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" "Study A Researcher Policy")
 STUDY_B_POLICY_ID=$(get_policy_id "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" "Study B Researcher Policy")
-SENIOR_POLICY_ID=$(get_policy_id "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" "Senior Researcher Policy")
 ADMIN_POLICY_ID=$(get_policy_id "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" "Admin Policy")
 
 echo "    • Study A Researcher Policy: $STUDY_A_POLICY_ID"
 echo "    • Study B Researcher Policy: $STUDY_B_POLICY_ID"
-echo "    • Senior Researcher Policy: $SENIOR_POLICY_ID"
 echo "    • Admin Policy: $ADMIN_POLICY_ID"
 
 # Créer les permissions
@@ -254,27 +252,27 @@ create_scope_permission "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" \
     "Study A Read Permission" \
     "$STUDY_A_RES_ID" \
     "$READ_SCOPE_ID" \
-    "$STUDY_A_POLICY_ID" "$SENIOR_POLICY_ID" "$ADMIN_POLICY_ID"
+    "$STUDY_A_POLICY_ID" "$ADMIN_POLICY_ID"
 
 create_scope_permission "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" \
     "Study B Read Permission" \
     "$STUDY_B_RES_ID" \
     "$READ_SCOPE_ID" \
-    "$STUDY_B_POLICY_ID" "$SENIOR_POLICY_ID" "$ADMIN_POLICY_ID"
+    "$STUDY_B_POLICY_ID" "$ADMIN_POLICY_ID"
 
 create_scope_permission "$H1_URL" "$H1_REALM" "$H1_CLIENT_UUID" "$H1_TOKEN" \
     "Patient Data Read Permission" \
     "$PATIENT_DATA_RES_ID" \
     "$READ_SCOPE_ID" \
-    "$STUDY_A_POLICY_ID" "$STUDY_B_POLICY_ID" "$SENIOR_POLICY_ID" "$ADMIN_POLICY_ID"
+    "$STUDY_A_POLICY_ID" "$STUDY_B_POLICY_ID" "$ADMIN_POLICY_ID"
 
 echo "  ✅ Hospital 1 configuré avec succès!"
 
 # ============================================================
-# HOSPITAL 2 - ABAC Configuration
+# HOSPITAL 2 - RBAC Configuration (Same as H1)
 # ============================================================
 echo ""
-echo "🏥 Configuration Hospital 2 (ABAC)..."
+echo "🏥 Configuration Hospital 2 (RBAC)..."
 
 H2_URL="http://localhost:8082"
 H2_REALM="hospital2-realm"
@@ -313,71 +311,17 @@ echo "    • patient_data: $H2_PATIENT_DATA_RES_ID"
 # Récupérer les IDs des scopes
 echo "  🔍 Récupération des IDs des scopes..."
 H2_READ_SCOPE_ID=$(get_scope_id "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" "read")
-H2_READ_FULL_SCOPE_ID=$(get_scope_id "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" "read_full")
-H2_READ_ANON_SCOPE_ID=$(get_scope_id "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" "read_anonymized")
 
 echo "    • read: $H2_READ_SCOPE_ID"
-echo "    • read_full: $H2_READ_FULL_SCOPE_ID"
-echo "    • read_anonymized: $H2_READ_ANON_SCOPE_ID"
 
-# Créer les policies JavaScript (ABAC)
-echo "  📜 Création des policies JavaScript (ABAC)..."
-
-# Allowed Studies Policy
-ALLOWED_STUDIES_JS='var context = $evaluation.getContext();
-var identity = context.getIdentity();
-var attributes = identity.getAttributes();
-var allowedStudies = attributes.getValue("allowed_studies");
-var resource = $evaluation.getPermission().getResource();
-if (resource && resource.getName) {
-  var resourceName = resource.getName();
-  if (resourceName === "study_A" && allowedStudies && allowedStudies.contains("study_A")) {
-    $evaluation.grant();
-  } else if (resourceName === "study_B" && allowedStudies && allowedStudies.contains("study_B")) {
-    $evaluation.grant();
-  }
-}'
-
-H2_ALLOWED_STUDIES_POLICY_ID=$(create_js_policy "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
-    "Allowed Studies Policy" \
-    "ABAC policy checking allowed_studies attribute" \
-    "$ALLOWED_STUDIES_JS")
-
-# High Clearance Policy
-HIGH_CLEARANCE_JS='var context = $evaluation.getContext();
-var identity = context.getIdentity();
-var attributes = identity.getAttributes();
-var clearance = attributes.getValue("clearance_level");
-if (clearance && (clearance === "high" || clearance.contains("high"))) {
-  $evaluation.grant();
-}'
-
-H2_HIGH_CLEARANCE_POLICY_ID=$(create_js_policy "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
-    "High Clearance Policy" \
-    "ABAC policy for high clearance level" \
-    "$HIGH_CLEARANCE_JS")
-
-# Medium Clearance Policy
-MEDIUM_CLEARANCE_JS='var context = $evaluation.getContext();
-var identity = context.getIdentity();
-var attributes = identity.getAttributes();
-var clearance = attributes.getValue("clearance_level");
-if (clearance && (clearance === "medium" || clearance === "high" || clearance.contains("medium") || clearance.contains("high"))) {
-  $evaluation.grant();
-}'
-
-H2_MEDIUM_CLEARANCE_POLICY_ID=$(create_js_policy "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
-    "Medium Clearance Policy" \
-    "ABAC policy for medium clearance level" \
-    "$MEDIUM_CLEARANCE_JS")
-
-# Get Admin Policy ID (already exists from JSON import)
-echo "  🔍 Récupération de l'Admin Policy..."
+# Récupérer les IDs des policies
+echo "  🔍 Récupération des IDs des policies..."
+H2_STUDY_A_POLICY_ID=$(get_policy_id "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" "Study A Researcher Policy")
+H2_STUDY_B_POLICY_ID=$(get_policy_id "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" "Study B Researcher Policy")
 H2_ADMIN_POLICY_ID=$(get_policy_id "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" "Admin Policy")
 
-echo "    • Allowed Studies Policy: $H2_ALLOWED_STUDIES_POLICY_ID"
-echo "    • High Clearance Policy: $H2_HIGH_CLEARANCE_POLICY_ID"
-echo "    • Medium Clearance Policy: $H2_MEDIUM_CLEARANCE_POLICY_ID"
+echo "    • Study A Researcher Policy: $H2_STUDY_A_POLICY_ID"
+echo "    • Study B Researcher Policy: $H2_STUDY_B_POLICY_ID"
 echo "    • Admin Policy: $H2_ADMIN_POLICY_ID"
 
 # Créer les permissions
@@ -387,25 +331,19 @@ create_scope_permission "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
     "Study A Read Permission" \
     "$H2_STUDY_A_RES_ID" \
     "$H2_READ_SCOPE_ID" \
-    "$H2_ALLOWED_STUDIES_POLICY_ID" "$H2_ADMIN_POLICY_ID"
+    "$H2_STUDY_A_POLICY_ID" "$H2_ADMIN_POLICY_ID"
 
 create_scope_permission "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
     "Study B Read Permission" \
     "$H2_STUDY_B_RES_ID" \
     "$H2_READ_SCOPE_ID" \
-    "$H2_ALLOWED_STUDIES_POLICY_ID" "$H2_ADMIN_POLICY_ID"
+    "$H2_STUDY_B_POLICY_ID" "$H2_ADMIN_POLICY_ID"
 
 create_scope_permission "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
-    "Patient Full Data Permission" \
+    "Patient Data Read Permission" \
     "$H2_PATIENT_DATA_RES_ID" \
-    "$H2_READ_FULL_SCOPE_ID" \
-    "$H2_HIGH_CLEARANCE_POLICY_ID" "$H2_ADMIN_POLICY_ID"
-
-create_scope_permission "$H2_URL" "$H2_REALM" "$H2_CLIENT_UUID" "$H2_TOKEN" \
-    "Patient Anonymized Data Permission" \
-    "$H2_PATIENT_DATA_RES_ID" \
-    "$H2_READ_ANON_SCOPE_ID" \
-    "$H2_MEDIUM_CLEARANCE_POLICY_ID" "$H2_HIGH_CLEARANCE_POLICY_ID" "$H2_ADMIN_POLICY_ID"
+    "$H2_READ_SCOPE_ID" \
+    "$H2_STUDY_A_POLICY_ID" "$H2_STUDY_B_POLICY_ID" "$H2_ADMIN_POLICY_ID"
 
 echo "  ✅ Hospital 2 configuré avec succès!"
 
@@ -416,14 +354,19 @@ echo "🔍 Vérification:"
 echo "   - Hospital 1: ${H1_URL}/admin/master/console/#/${H1_REALM}/clients/${H1_CLIENT_UUID}/authorization"
 echo "   - Hospital 2: ${H2_URL}/admin/master/console/#/${H2_REALM}/clients/${H2_CLIENT_UUID}/authorization"
 echo ""
-echo "📋 Permissions créées:"
-echo "   Hospital 1 (RBAC):"
-echo "     • Study A Read Permission (study_A_researcher, senior_researcher, admin)"
-echo "     • Study B Read Permission (study_B_researcher, senior_researcher, admin)"
-echo "     • Patient Data Read Permission (all researchers)"
+echo "📋 Permissions créées (RBAC pour les deux hôpitaux):"
+echo "   Hospital 1:"
+echo "     • Study A Read Permission (study_A_researcher, admin)"
+echo "     • Study B Read Permission (study_B_researcher, admin)"
+echo "     • Patient Data Read Permission (study_A_researcher, study_B_researcher, admin)"
 echo ""
-echo "   Hospital 2 (ABAC):"
-echo "     • Study A Read Permission (allowed_studies contains 'study_A')"
-echo "     • Study B Read Permission (allowed_studies contains 'study_B')"
-echo "     • Patient Full Data Permission (clearance_level = 'high')"
-echo "     • Patient Anonymized Data Permission (clearance_level = 'medium' or 'high')"
+echo "   Hospital 2:"
+echo "     • Study A Read Permission (study_A_researcher, admin)"
+echo "     • Study B Read Permission (study_B_researcher, admin)"
+echo "     • Patient Data Read Permission (study_A_researcher, study_B_researcher, admin)"
+echo ""
+echo "👥 Affectation des utilisateurs (répliquée sur les 3 Keycloaks):"
+echo "   - alice:  study_A_researcher → Accès study_A uniquement"
+echo "   - bob:    study_B_researcher → Accès study_B uniquement"
+echo "   - carol:  study_A_researcher + study_B_researcher → Accès aux deux études"
+echo "   - dave:   admin → Accès complet"

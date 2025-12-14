@@ -4,17 +4,9 @@
   "enabled": true,
   "roles": {
     "realm": [
-      { "name": "admin" },
-      { "name": "user" },
-      { "name": "manager" },
-      { "name": "developer" },
-      { "name": "guest" },
-      { "name": "hospital-staff" },
-      { "name": "doctor" },
-      { "name": "nurse" },
+      { "name": "admin", "description": "Full administrative access to all resources" },
       { "name": "study_A_researcher", "description": "Can access study_A data" },
-      { "name": "study_B_researcher", "description": "Can access study_B data" },
-      { "name": "senior_researcher", "description": "Can access all studies" }
+      { "name": "study_B_researcher", "description": "Can access study_B data" }
     ]
   },
   "clients": [
@@ -91,16 +83,6 @@
             }
           },
           {
-            "name": "Senior Researcher Policy",
-            "description": "Policy for senior researchers",
-            "type": "role",
-            "logic": "POSITIVE",
-            "decisionStrategy": "UNANIMOUS",
-            "config": {
-              "roles": "[{\"id\":\"senior_researcher\",\"required\":true}]"
-            }
-          },
-          {
             "name": "Admin Policy",
             "description": "Policy for administrators",
             "type": "role",
@@ -133,7 +115,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["admin", "user", "doctor", "senior_researcher"],
+      "realmRoles": ["study_A_researcher"],
       "requiredActions": []
     },
     {
@@ -150,7 +132,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user", "nurse", "study_A_researcher"],
+      "realmRoles": ["study_B_researcher"],
       "requiredActions": []
     },
     {
@@ -167,7 +149,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["manager", "hospital-staff", "study_B_researcher"],
+      "realmRoles": ["study_A_researcher", "study_B_researcher"],
       "requiredActions": []
     },
     {
@@ -184,109 +166,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["developer", "study_A_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "eve",
-      "firstName": "Eve",
-      "lastName": "Evans",
-      "email": "eve@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "eve",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["guest"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "frank",
-      "firstName": "Frank",
-      "lastName": "Foster",
-      "email": "frank@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "frank",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["user", "study_B_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "grace",
-      "firstName": "Grace",
-      "lastName": "Green",
-      "email": "grace@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "grace",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["manager", "developer", "senior_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "heidi",
-      "firstName": "Heidi",
-      "lastName": "Hunt",
-      "email": "heidi@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "heidi",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["guest"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "ivan",
-      "firstName": "Ivan",
-      "lastName": "Ivers",
-      "email": "ivan@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "ivan",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["developer", "study_A_researcher", "study_B_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "judy",
-      "firstName": "Judy",
-      "lastName": "Jones",
-      "email": "judy@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "judy",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["user", "nurse", "study_B_researcher"],
+      "realmRoles": ["admin"],
       "requiredActions": []
     }
   ]

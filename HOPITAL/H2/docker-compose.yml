@@ -44,7 +44,7 @@ services:
       # Variables spécifiques au mode HOSPITAL
       - PUBLIC_ISSUER=http://localhost:8080/realms/myrealm
       - JWKS_URI=http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/certs
-      - FUSEKI_URL=http://fuseki:3030/dataset/query
+      - FUSEKI_URL=http://fuseki:3030/dataset/sparql
       # Variables pour le Keycloak local (token exchange)
       - LOCAL_KEYCLOAK_URL=http://keycloak-h2:8080
       - LOCAL_REALM=hospital2-realm

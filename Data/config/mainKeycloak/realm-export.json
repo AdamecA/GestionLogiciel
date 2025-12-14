@@ -41,7 +41,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["admin", "user"],
+      "realmRoles": ["user"],
       "requiredActions": []
     },
     {
@@ -75,7 +75,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["manager"],
+      "realmRoles": ["user"],
       "requiredActions": []
     },
     {
@@ -92,109 +92,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["developer"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "eve",
-      "firstName": "Eve",
-      "lastName": "Evans",
-      "email": "eve@example.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "eve",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["guest"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "frank",
-      "firstName": "Frank",
-      "lastName": "Foster",
-      "email": "frank@example.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "guest",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["user"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "grace",
-      "firstName": "Grace",
-      "lastName": "Green",
-      "email": "grace@example.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "grace",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["manager", "developer"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "heidi",
-      "firstName": "Heidi",
-      "lastName": "Hunt",
-      "email": "heidi@example.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "heidi",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["guest"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "ivan",
-      "firstName": "Ivan",
-      "lastName": "Ivers",
-      "email": "ivan@example.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "ivan",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["developer"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "judy",
-      "firstName": "Judy",
-      "lastName": "Jones",
-      "email": "judy@example.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "judy",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["user"],
+      "realmRoles": ["admin"],
       "requiredActions": []
     }
   ]

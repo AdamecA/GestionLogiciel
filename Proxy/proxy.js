@@ -156,28 +156,6 @@ async function checkPermission(localToken, resourceName, scope) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// FONCTION POUR EXTRAIRE LA STUDY D'UNE REQUÊTE SPARQL
-// ─────────────────────────────────────────────────────────────
-function extractStudyFromSPARQL(sparqlQuery) {
-    try {
-        const query = sparqlQuery.toLowerCase();
-
-        // Cherche des patterns comme "res:study_A" ou "study_A" dans la requête
-        if (query.includes('study_a') || query.includes('res:study_a')) {
-            return 'study_A';
-        } else if (query.includes('study_b') || query.includes('res:study_b')) {
-            return 'study_B';
-        }
-
-        // Si aucune étude spécifique n'est mentionnée, retourne null (accès général)
-        return null;
-    } catch (err) {
-        console.error(`Error parsing SPARQL: ${err.message}`);
-        return null;
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
 // LOGIQUE SPÉCIFIQUE AU FORWARD PROXY
 // ─────────────────────────────────────────────────────────────
 function startForwardProxy() {
@@ -319,34 +297,245 @@ function startHospitalProxy() {
                 return res.status(400).json({ error: "Requete SPARQL manquante" });
             }
 
-            // ÉTAPE 3: VÉRIFICATION DES PERMISSIONS VIA KEYCLOAK
-            // Déterminer quelle ressource l'utilisateur essaie d'accéder
-            const studyRequested = extractStudyFromSPARQL(sparqlQuery);
-            let resourceToCheck = 'patient_data'; // Par défaut
+            // ÉTAPE 3: DÉTERMINER LES ÉTUDES ACCESSIBLES VIA KEYCLOAK AUTHORIZATION
+            console.log(`🔐 [HOSPITAL] Checking study permissions via Keycloak Authorization for ${decoded.preferred_username}`);
 
-            if (studyRequested === 'study_A') {
-                resourceToCheck = 'study_A';
-            } else if (studyRequested === 'study_B') {
-                resourceToCheck = 'study_B';
+            // Vérifier les permissions pour chaque étude via Keycloak
+            const allowedStudies = [];
+
+            // Vérifier study_A
+            const studyAPermission = await checkPermission(localToken, 'study_A', 'read');
+            if (studyAPermission.granted) {
+                allowedStudies.push('res:study_A');
+                console.log(`✅ [HOSPITAL] User has access to study_A (granted by Keycloak)`);
             }
 
-            // Vérifier la permission avec Keycloak
-            const permissionResult = await checkPermission(localToken, resourceToCheck, 'read');
+            // Vérifier study_B
+            const studyBPermission = await checkPermission(localToken, 'study_B', 'read');
+            if (studyBPermission.granted) {
+                allowedStudies.push('res:study_B');
+                console.log(`✅ [HOSPITAL] User has access to study_B (granted by Keycloak)`);
+            }
 
-            if (!permissionResult.granted) {
-                console.error(`🚫 [HOSPITAL] Access DENIED for user ${decoded.preferred_username} to resource ${resourceToCheck}`);
+            console.log(`🔍 [HOSPITAL] User ${decoded.preferred_username} allowed studies (from Keycloak): ${allowedStudies.join(', ') || 'none'}`);
+
+            if (allowedStudies.length === 0) {
+                console.error(`🚫 [HOSPITAL] User ${decoded.preferred_username} has no study access (denied by Keycloak policies)`);
                 return res.status(403).json({
                     error: "Access Denied",
-                    message: `You do not have permission to access ${resourceToCheck}`,
+                    message: "You do not have permission to access any study data",
+                    reason: "No study permissions granted by authorization policies"
+                });
+            }
+
+            // ÉTAPE 4: FILTRAGE DES REQUÊTES SELON LE TYPE
+            let rewrittenQuery = sparqlQuery;
+
+            // CAS 1: Détection si FedUP interroge un patient spécifique
+            // Pattern: <http://example.org/resource/patient1> ou <http://example.org/resource/patient2>
+            const patientUriMatch = sparqlQuery.match(/<http:\/\/example\.org\/resource\/(patient\d+)>/i);
+
+            if (patientUriMatch) {
+                // FedUP demande un patient spécifique - vérifier l'accès
+                const patientId = patientUriMatch[1];
+                console.log(`🔍 [HOSPITAL] FedUP querying specific patient: ${patientId}`);
+
+                // Vérifier à quelle(s) étude(s) appartient ce patient
+                const studyCheckQuery = `PREFIX ex: <http://example.org/schema#>
+PREFIX res: <http://example.org/resource/>
+SELECT ?study WHERE { res:${patientId} ex:partOf ?study }`;
+
+                try {
+                    console.log(`🔍 [DEBUG] Querying Fuseki for patient ${patientId} studies...`);
+                    console.log(`🔍 [DEBUG] Fuseki URL: ${FUSEKI_URL}`);
+                    console.log(`🔍 [DEBUG] Study check query: ${studyCheckQuery}`);
+
+                    const requestBody = new URLSearchParams({ query: studyCheckQuery });
+                    console.log(`🔍 [DEBUG] Request body: ${requestBody.toString()}`);
+
+                    const studyRes = await fetch(FUSEKI_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                        body: requestBody
+                    });
+
+                    console.log(`🔍 [DEBUG] Fuseki response status: ${studyRes.status}`);
+                    const responseText = await studyRes.text();
+                    console.log(`🔍 [DEBUG] Fuseki response text: ${responseText}`);
+
+                    const studyResult = JSON.parse(responseText);
+                    console.log(`🔍 [DEBUG] Fuseki response parsed: ${JSON.stringify(studyResult)}`);
+
+                    const patientStudies = studyResult.results.bindings.map(b => b.study.value);
+                    console.log(`🔍 [DEBUG] Extracted patient studies: ${JSON.stringify(patientStudies)}`);
+
+                    if (patientStudies.length === 0) {
+                        // Patient n'appartient à aucune étude ou n'existe pas
+                        console.log(`⚠️ [HOSPITAL] Patient ${patientId} has no study association`);
+                        return res.status(200).json({
+                            head: { vars: [] },
+                            results: { bindings: [] }
+                        });
+                    }
+
+                    // Vérifier si l'utilisateur a accès à au moins une des études du patient
+                    const allowedStudyUris = allowedStudies.map(s =>
+                        `http://example.org/resource/${s.replace('res:', '')}`
+                    );
+
+                    const hasAccess = patientStudies.some(ps => allowedStudyUris.includes(ps));
+
+                    if (!hasAccess) {
+                        console.log(`🚫 [HOSPITAL] User ${decoded.preferred_username} DENIED access to ${patientId}`);
+                        console.log(`   Patient belongs to: ${patientStudies.join(', ')}`);
+                        console.log(`   User has access to: ${allowedStudyUris.join(', ')}`);
+
+                        // Retourner une réponse vide (ne pas révéler l'existence du patient)
+                        return res.status(200).json({
+                            head: { vars: [] },
+                            results: { bindings: [] }
+                        });
+                    }
+
+                    console.log(`✅ [HOSPITAL] User ${decoded.preferred_username} GRANTED access to ${patientId}`);
+                    // Continuer avec la requête originale - pas de réécriture nécessaire
+
+                } catch (err) {
+                    console.error(`❌ [HOSPITAL] Error checking patient study: ${err.message}`);
+                    return res.status(500).json({ error: "Internal error checking access" });
+                }
+
+            } else {
+                // CAS 2: Requête générale (pas un patient spécifique) - vérifier les filtres d'étude
+
+                // Détecter si l'utilisateur essaie d'interroger des études spécifiques
+                const studyFilterMatch = sparqlQuery.match(/(?:ex:partOf|<http:\/\/example\.org\/schema#partOf>)\s+(?:res:(\w+)|<http:\/\/example\.org\/resource\/(\w+)>)/gi);
+
+                if (studyFilterMatch) {
+                    // L'utilisateur a spécifié des études dans sa requête - vérifier qu'il y a accès
+                    const requestedStudies = [];
+
+                    for (const match of studyFilterMatch) {
+                        // Extraire le nom de l'étude
+                        const studyMatch = match.match(/(?:res:(\w+)|resource\/(\w+))/i);
+                        if (studyMatch) {
+                            const studyName = studyMatch[1] || studyMatch[2];
+                            if (studyName && !requestedStudies.includes(studyName)) {
+                                requestedStudies.push(studyName);
+                            }
+                        }
+                    }
+
+                    console.log(`🔍 [HOSPITAL] User requesting access to studies: ${requestedStudies.join(', ')}`);
+
+                    // Vérifier que l'utilisateur a accès à TOUTES les études demandées
+                    const allowedStudyNames = allowedStudies.map(s => s.replace('res:', ''));
+                    const unauthorizedStudies = requestedStudies.filter(s => !allowedStudyNames.includes(s));
+
+                    if (unauthorizedStudies.length > 0) {
+                        console.error(`🚫 [HOSPITAL] User ${decoded.preferred_username} attempting to access unauthorized studies: ${unauthorizedStudies.join(', ')}`);
+                        console.error(`   User has access to: ${allowedStudyNames.join(', ')}`);
+
+                        return res.status(403).json({
+                            error: "Access Denied",
+                            message: `You do not have permission to access the following studies: ${unauthorizedStudies.join(', ')}`,
+                            reason: `User ${decoded.preferred_username} only has access to: ${allowedStudyNames.join(', ')}`
+                        });
+                    }
+
+                    console.log(`✅ [HOSPITAL] User ${decoded.preferred_username} authorized to query requested studies`);
+                }
+
+                const hasPatientPattern = sparqlQuery.toLowerCase().includes('ex:patient') ||
+                                          sparqlQuery.toLowerCase().includes('<http://example.org/schema#patient>');
+
+                // Appliquer la réécriture uniquement si aucun filtre d'étude n'est spécifié
+                if (hasPatientPattern && !studyFilterMatch) {
+                    // Détecter quelle variable l'utilisateur utilise pour les patients
+                    // Chercher des patterns comme "?patient a ex:Patient" ou "?p a <http://.../Patient>"
+                    let patientVar = '?p'; // Valeur par défaut
+
+                    const patientVarMatch = sparqlQuery.match(/(\?\w+)\s+a\s+(?:ex:Patient|<http:\/\/example\.org\/schema#Patient>)/i);
+                    if (patientVarMatch) {
+                        patientVar = patientVarMatch[1];
+                        console.log(`🔍 [HOSPITAL] Detected patient variable: ${patientVar}`);
+                    }
+
+                    // Détecter si la requête utilise des URIs complètes ou des préfixes
+                    const usesFullUris = sparqlQuery.includes('<http://example.org/schema#Patient>');
+
+                    // S'assurer que les préfixes nécessaires sont présents (si on n'utilise pas full URIs)
+                    const hasResPrefix = sparqlQuery.toLowerCase().includes('prefix res:');
+                    const hasExPrefix = sparqlQuery.toLowerCase().includes('prefix ex:');
+                    let prefixToAdd = '';
+
+                    if (!usesFullUris && !hasResPrefix) {
+                        prefixToAdd = 'PREFIX res: <http://example.org/resource/>\n';
+                    }
+                    if (!usesFullUris && !hasExPrefix) {
+                        prefixToAdd += 'PREFIX ex: <http://example.org/schema#>\n';
+                    }
+
+                    // Trouver la clause WHERE et ajouter le pattern ex:partOf
+                    const whereMatch = sparqlQuery.match(/WHERE\s*\{/i);
+                    if (whereMatch) {
+                        const whereIndex = whereMatch.index + whereMatch[0].length;
+
+                        // Construire le filtre pour les études autorisées
+                        let filterClause;
+
+                        if (usesFullUris) {
+                            // Utiliser des URIs complètes dans le filtre
+                            const studiesFullUris = allowedStudies.map(s =>
+                                `<http://example.org/resource/${s.replace('res:', '')}>`
+                            );
+
+                            if (studiesFullUris.length === 1) {
+                                filterClause = `\n  ${patientVar} <http://example.org/schema#partOf> ${studiesFullUris[0]} .`;
+                            } else {
+                                const studiesList = studiesFullUris.join(', ');
+                                filterClause = `\n  ${patientVar} <http://example.org/schema#partOf> ?study .\n  FILTER (?study IN (${studiesList}))`;
+                            }
+                        } else {
+                            // Utiliser des préfixes dans le filtre
+                            if (allowedStudies.length === 1) {
+                                filterClause = `\n  ${patientVar} ex:partOf ${allowedStudies[0]} .`;
+                            } else {
+                                const studiesList = allowedStudies.join(', ');
+                                filterClause = `\n  ${patientVar} ex:partOf ?study .\n  FILTER (?study IN (${studiesList}))`;
+                            }
+                        }
+
+                        // Reconstruire la requête avec préfixe si nécessaire
+                        rewrittenQuery = prefixToAdd +
+                                       sparqlQuery.substring(0, whereIndex) +
+                                       filterClause +
+                                       sparqlQuery.substring(whereIndex);
+
+                        console.log(`🔄 [HOSPITAL] Query rewritten to filter by allowed studies`);
+                        console.log(`📝 [HOSPITAL] Original query: ${sparqlQuery}`);
+                        console.log(`📝 [HOSPITAL] Rewritten query: ${rewrittenQuery}`);
+                    }
+                }
+            }
+
+            // Vérifier la permission générale pour patient_data
+            const permissionResult = await checkPermission(localToken, 'patient_data', 'read');
+
+            if (!permissionResult.granted) {
+                console.error(`🚫 [HOSPITAL] Access DENIED for user ${decoded.preferred_username} to patient_data`);
+                return res.status(403).json({
+                    error: "Access Denied",
+                    message: "You do not have permission to access patient data",
                     reason: permissionResult.reason
                 });
             }
 
-            console.log(`✅ [HOSPITAL] Access GRANTED for user ${decoded.preferred_username} to resource ${resourceToCheck}`);
+            console.log(`✅ [HOSPITAL] Access GRANTED for user ${decoded.preferred_username} to patient_data`);
 
-            // ÉTAPE 4: ENVOI VERS FUSEKI LOCAL (avec le token local)
+            // ÉTAPE 5: ENVOI VERS FUSEKI LOCAL (avec la requête réécrite)
             const formBody = new URLSearchParams({
-                query: sparqlQuery
+                query: rewrittenQuery
             });
 
             const fusekiRes = await fetch(FUSEKI_URL, {
