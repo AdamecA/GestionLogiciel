@@ -6,6 +6,7 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_FEATURES: admin-fine-grained-authz:v1,token-exchange
     volumes:
       - ../../Data/config/hospital1Keycloak:/opt/keycloak/data/import
     ports:

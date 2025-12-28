@@ -4,11 +4,10 @@
   "enabled": true,
   "roles": {
     "realm": [
-      { "name": "admin" },
-      { "name": "user" },
-      { "name": "manager" },
-      { "name": "developer" },
-      { "name": "guest" }
+      { "name": "admin", "description": "Full administrative access" },
+      { "name": "user", "description": "Basic user role" },
+      { "name": "study_A_researcher", "description": "Can access Study A data" },
+      { "name": "study_B_researcher", "description": "Can access Study B data" }
     ]
   },
   "clients": [
@@ -23,7 +22,45 @@
       "serviceAccountsEnabled": false,
       "authorizationServicesEnabled": false,
       "defaultRoles": [],
-      "webOrigins": ["*"]
+      "webOrigins": ["*"],
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "post.logout.redirect.uris": "+"
+      }
+    },
+    {
+      "clientId": "hospital1-broker",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "hospital1-broker-secret",
+      "redirectUris": ["*"],
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "webOrigins": ["*"],
+      "attributes": {
+        "access.token.lifespan": "300"
+      }
+    },
+    {
+      "clientId": "hospital2-broker",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "hospital2-broker-secret",
+      "redirectUris": ["*"],
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "webOrigins": ["*"],
+      "attributes": {
+        "access.token.lifespan": "300"
+      }
     }
   ],
   "users": [
@@ -41,7 +78,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user"],
+      "realmRoles": ["user", "study_A_researcher"],
       "requiredActions": []
     },
     {
@@ -58,7 +95,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user"],
+      "realmRoles": ["user", "study_B_researcher"],
       "requiredActions": []
     },
     {
@@ -75,7 +112,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user"],
+      "realmRoles": ["user", "study_A_researcher", "study_B_researcher"],
       "requiredActions": []
     },
     {

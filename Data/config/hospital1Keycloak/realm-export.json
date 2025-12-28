@@ -2,6 +2,68 @@
   "id": "hospital1-realm",
   "realm": "hospital1-realm",
   "enabled": true,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+  "identityProviders": [
+    {
+      "alias": "central-keycloak",
+      "displayName": "Central Keycloak",
+      "providerId": "keycloak-oidc",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": true,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "tokenUrl": "http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/token",
+        "authorizationUrl": "http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/auth",
+        "logoutUrl": "http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/logout",
+        "userInfoUrl": "http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/userinfo",
+        "jwksUrl": "http://keycloak-central:8080/realms/myrealm/protocol/openid-connect/certs",
+        "issuer": "http://localhost:8080/realms/myrealm",
+        "clientId": "hospital1-broker",
+        "clientSecret": "hospital1-broker-secret",
+        "validateSignature": "true",
+        "useJwksUrl": "true",
+        "syncMode": "FORCE"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "study_A_researcher role mapper",
+      "identityProviderAlias": "central-keycloak",
+      "identityProviderMapper": "oidc-role-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "realm_access.roles",
+        "claim.value": "study_A_researcher",
+        "role": "study_A_researcher"
+      }
+    },
+    {
+      "name": "study_B_researcher role mapper",
+      "identityProviderAlias": "central-keycloak",
+      "identityProviderMapper": "oidc-role-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "realm_access.roles",
+        "claim.value": "study_B_researcher",
+        "role": "study_B_researcher"
+      }
+    },
+    {
+      "name": "admin role mapper",
+      "identityProviderAlias": "central-keycloak",
+      "identityProviderMapper": "oidc-role-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "realm_access.roles",
+        "claim.value": "admin",
+        "role": "admin"
+      }
+    }
+  ],
   "roles": {
     "realm": [
       { "name": "admin", "description": "Full administrative access to all resources" },
@@ -17,12 +79,19 @@
       "secret": "hospital1-secret",
       "redirectUris": ["*"],
       "protocol": "openid-connect",
-      "standardFlowEnabled": false,
+      "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": true,
       "defaultRoles": [],
       "webOrigins": ["*"],
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "token.exchange.standard.flow.enabled": "true"
+      },
       "authorizationSettings": {
         "allowRemoteResourceManagement": true,
         "policyEnforcementMode": "ENFORCING",
@@ -91,6 +160,39 @@
             "config": {
               "roles": "[{\"id\":\"admin\",\"required\":true}]"
             }
+          },
+          {
+            "name": "Study A Permission",
+            "description": "Permission to access Study A",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"study_A\"]",
+              "applyPolicies": "[\"Study A Researcher Policy\",\"Admin Policy\"]"
+            }
+          },
+          {
+            "name": "Study B Permission",
+            "description": "Permission to access Study B",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"study_B\"]",
+              "applyPolicies": "[\"Study B Researcher Policy\",\"Admin Policy\"]"
+            }
+          },
+          {
+            "name": "Patient Data Permission",
+            "description": "Permission to access Patient Data",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"patient_data\"]",
+              "applyPolicies": "[\"Study A Researcher Policy\",\"Study B Researcher Policy\",\"Admin Policy\"]"
+            }
           }
         ],
         "scopes": [
@@ -100,74 +202,5 @@
       }
     }
   ],
-  "users": [
-    {
-      "enabled": true,
-      "username": "alice",
-      "firstName": "Alice",
-      "lastName": "Anderson",
-      "email": "alice@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "alice",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["study_A_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "bob",
-      "firstName": "Bob",
-      "lastName": "Brown",
-      "email": "bob@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "bob",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["study_B_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "carol",
-      "firstName": "Carol",
-      "lastName": "Clark",
-      "email": "carol@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "carol",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["study_A_researcher", "study_B_researcher"],
-      "requiredActions": []
-    },
-    {
-      "enabled": true,
-      "username": "dave",
-      "firstName": "Dave",
-      "lastName": "Davis",
-      "email": "dave@hospital1.com",
-      "emailVerified": true,
-      "credentials": [
-        {
-          "type": "password",
-          "value": "dave",
-          "temporary": false
-        }
-      ],
-      "realmRoles": ["admin"],
-      "requiredActions": []
-    }
-  ]
+  "users": []
 }

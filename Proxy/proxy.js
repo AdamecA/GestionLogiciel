@@ -65,28 +65,30 @@ function verifyToken(token) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// FONCTION D'ÉCHANGE DE TOKEN (Token Translation)
+// TOKEN EXCHANGE (RFC 8693)
+// Échange le token Central contre un token local Hospital
+// Le Keycloak local utilise Central Keycloak comme Identity Provider
+// et mappe automatiquement les rôles via les Identity Provider Mappers
 // ─────────────────────────────────────────────────────────────
-async function exchangeTokenForLocal(centralToken) {
+
+async function exchangeToken(centralToken) {
     try {
-        // 1. Décoder le token central pour extraire le username
-        const decoded = jwt.decode(centralToken);
-        if (!decoded || !decoded.preferred_username) {
-            throw new Error('Unable to extract username from central token');
-        }
-
-        const username = decoded.preferred_username;
-        console.log(`🔄 [TokenExchange] Exchanging token for user: ${username}`);
-
-        // 2. Obtenir un token du Keycloak local en utilisant username=password
         const tokenUrl = `${LOCAL_KEYCLOAK_URL}/realms/${LOCAL_REALM}/protocol/openid-connect/token`;
 
         const params = new URLSearchParams();
-        params.append('grant_type', 'password');
+        // RFC 8693 Token Exchange with Identity Provider
+        params.append('grant_type', 'urn:ietf:params:oauth:grant-type:token-exchange');
+        params.append('subject_token', centralToken);
+        params.append('subject_token_type', 'urn:ietf:params:oauth:token-type:access_token');
+        params.append('requested_token_type', 'urn:ietf:params:oauth:token-type:access_token');
         params.append('client_id', LOCAL_CLIENT_ID);
         params.append('client_secret', LOCAL_CLIENT_SECRET);
-        params.append('username', username);
-        params.append('password', username); // username = password (simulation de fédération)
+        // subject_issuer indique quel Identity Provider a émis le token original
+        // Cela doit correspondre à l'alias de l'Identity Provider configuré
+        params.append('subject_issuer', 'central-keycloak');
+
+        console.log(`🔄 [TokenExchange] Exchanging Central token for local Hospital token...`);
+        console.log(`🔄 [TokenExchange] Using subject_issuer: central-keycloak`);
 
         const response = await fetch(tokenUrl, {
             method: 'POST',
@@ -98,11 +100,17 @@ async function exchangeTokenForLocal(centralToken) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Local Keycloak token exchange failed: ${response.status} - ${errorText}`);
+            console.error(`❌ [TokenExchange] Failed: ${response.status} - ${errorText}`);
+            throw new Error(`Token exchange failed: ${response.status} - ${errorText}`);
         }
 
         const tokenData = await response.json();
-        console.log(`✅ [TokenExchange] Local token obtained for ${username}`);
+        console.log(`✅ [TokenExchange] Successfully obtained local Hospital token`);
+
+        // Décoder le token local pour voir les rôles mappés
+        const localDecoded = jwt.decode(tokenData.access_token);
+        const localRoles = localDecoded?.realm_access?.roles || [];
+        console.log(`📋 [TokenExchange] Local token roles (mapped from Central): ${localRoles.join(', ')}`);
 
         return tokenData.access_token;
 
@@ -113,21 +121,24 @@ async function exchangeTokenForLocal(centralToken) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// FONCTION DE VÉRIFICATION DES PERMISSIONS VIA KEYCLOAK
+// VÉRIFICATION DES PERMISSIONS VIA KEYCLOAK AUTHORIZATION API
+// Utilise le token local (échangé) pour évaluer les politiques locales
 // ─────────────────────────────────────────────────────────────
+
 async function checkPermission(localToken, resourceName, scope) {
     try {
         console.log(`🔐 [Authorization] Checking permission for resource: ${resourceName}, scope: ${scope}`);
 
-        // Appel à l'API Keycloak Token Endpoint pour obtenir un RPT (Requesting Party Token)
-        const tokenUrl = `${LOCAL_KEYCLOAK_URL}/realms/${LOCAL_REALM}/protocol/openid-connect/token`;
+        // Utiliser l'API d'autorisation Keycloak avec le token local
+        const authzUrl = `${LOCAL_KEYCLOAK_URL}/realms/${LOCAL_REALM}/protocol/openid-connect/token`;
 
         const params = new URLSearchParams();
         params.append('grant_type', 'urn:ietf:params:oauth:grant-type:uma-ticket');
         params.append('audience', LOCAL_CLIENT_ID);
         params.append('permission', `${resourceName}#${scope}`);
+        params.append('response_mode', 'decision');
 
-        const response = await fetch(tokenUrl, {
+        const response = await fetch(authzUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -136,18 +147,19 @@ async function checkPermission(localToken, resourceName, scope) {
             body: params.toString()
         });
 
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`✅ [Authorization] Permission GRANTED for ${resourceName}#${scope}`);
-            return { granted: true, rpt: data.access_token };
-        } else if (response.status === 403 || response.status === 401) {
-            console.log(`❌ [Authorization] Permission DENIED for ${resourceName}#${scope}`);
-            return { granted: false, reason: 'Access denied by policy' };
-        } else {
-            const errorText = await response.text();
-            console.error(`⚠️ [Authorization] Error checking permission: ${response.status} - ${errorText}`);
-            return { granted: false, reason: `Authorization service error: ${response.status}` };
+        if (response.status === 200) {
+            const result = await response.json();
+            if (result.result === true) {
+                console.log(`✅ [Authorization] Permission GRANTED for ${resourceName}#${scope}`);
+                return { granted: true };
+            }
         }
+
+        // Si la réponse n'est pas 200 ou result != true, accès refusé
+        const errorText = await response.text();
+        console.log(`❌ [Authorization] Permission DENIED for ${resourceName}#${scope}`);
+        console.log(`   Response: ${response.status} - ${errorText}`);
+        return { granted: false, reason: 'Access denied by policy' };
 
     } catch (err) {
         console.error(`❌ [Authorization] Exception: ${err.message}`);
@@ -275,17 +287,15 @@ function startHospitalProxy() {
             const decoded = await verifyToken(centralToken);
             console.log(`✅ [HOSPITAL] Central token verified | User: ${decoded.preferred_username}`);
 
-            // ÉTAPE 2: ÉCHANGE DE TOKEN (Token Translation)
-            // Obtenir un token du Keycloak local basé sur l'utilisateur authentifié centralement
-            let localToken;
-            if (LOCAL_KEYCLOAK_URL && LOCAL_REALM && LOCAL_CLIENT_ID && LOCAL_CLIENT_SECRET) {
-                console.log(`🔄 [HOSPITAL] Performing token exchange...`);
-                localToken = await exchangeTokenForLocal(centralToken);
-                console.log(`✅ [HOSPITAL] Token exchange successful - using local token`);
-            } else {
-                console.warn(`⚠️ [HOSPITAL] No local Keycloak configured - using central token`);
-                localToken = centralToken;
-            }
+            // Afficher les rôles du token Central (pour debug)
+            const centralUserRoles = decoded.realm_access?.roles || [];
+            console.log(`📋 [HOSPITAL] User roles from Central token: ${centralUserRoles.join(', ')}`);
+
+            // ÉTAPE 2: TOKEN EXCHANGE - Échanger le token Central contre un token local
+            // Le Keycloak local fait confiance au Central via Identity Provider
+            // Les rôles sont automatiquement mappés via les Identity Provider Mappers
+            console.log(`🔄 [HOSPITAL] Performing token exchange with local Keycloak...`);
+            const localToken = await exchangeToken(centralToken);
 
             // RÉCUPÉRATION DE LA REQUÊTE SPARQL
             let sparqlQuery = req.body;
@@ -298,26 +308,27 @@ function startHospitalProxy() {
             }
 
             // ÉTAPE 3: DÉTERMINER LES ÉTUDES ACCESSIBLES VIA KEYCLOAK AUTHORIZATION
-            console.log(`🔐 [HOSPITAL] Checking study permissions via Keycloak Authorization for ${decoded.preferred_username}`);
+            // Le Keycloak local évalue ses politiques avec le token local (qui a les rôles mappés)
+            console.log(`🔐 [HOSPITAL] Checking study permissions via local Keycloak for ${decoded.preferred_username}`);
 
-            // Vérifier les permissions pour chaque étude via Keycloak
+            // Vérifier les permissions pour chaque étude via Keycloak local
             const allowedStudies = [];
 
-            // Vérifier study_A
+            // Vérifier study_A (utilise le token local avec les rôles mappés)
             const studyAPermission = await checkPermission(localToken, 'study_A', 'read');
             if (studyAPermission.granted) {
                 allowedStudies.push('res:study_A');
-                console.log(`✅ [HOSPITAL] User has access to study_A (granted by Keycloak)`);
+                console.log(`✅ [HOSPITAL] User has access to study_A (granted by local Keycloak policy)`);
             }
 
-            // Vérifier study_B
+            // Vérifier study_B (utilise le token local avec les rôles mappés)
             const studyBPermission = await checkPermission(localToken, 'study_B', 'read');
             if (studyBPermission.granted) {
                 allowedStudies.push('res:study_B');
-                console.log(`✅ [HOSPITAL] User has access to study_B (granted by Keycloak)`);
+                console.log(`✅ [HOSPITAL] User has access to study_B (granted by local Keycloak policy)`);
             }
 
-            console.log(`🔍 [HOSPITAL] User ${decoded.preferred_username} allowed studies (from Keycloak): ${allowedStudies.join(', ') || 'none'}`);
+            console.log(`🔍 [HOSPITAL] User ${decoded.preferred_username} allowed studies: ${allowedStudies.join(', ') || 'none'}`);
 
             if (allowedStudies.length === 0) {
                 console.error(`🚫 [HOSPITAL] User ${decoded.preferred_username} has no study access (denied by Keycloak policies)`);
@@ -331,11 +342,19 @@ function startHospitalProxy() {
             // ÉTAPE 4: FILTRAGE DES REQUÊTES SELON LE TYPE
             let rewrittenQuery = sparqlQuery;
 
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`📨 [QUERY] Requête SPARQL reçue:`);
+            console.log(`${sparqlQuery}`);
+            console.log(`${'='.repeat(60)}\n`);
+
             // CAS 1: Détection si FedUP interroge un patient spécifique
             // Pattern: <http://example.org/resource/patient1> ou <http://example.org/resource/patient2>
             const patientUriMatch = sparqlQuery.match(/<http:\/\/example\.org\/resource\/(patient\d+)>/i);
 
+            console.log(`🔎 [DETECTION] Patient URI spécifique trouvé: ${patientUriMatch ? patientUriMatch[1] : 'NON'}`);
+
             if (patientUriMatch) {
+                console.log(`➡️  [CAS 1] FedUP - Vérification accès patient spécifique`);
                 // FedUP demande un patient spécifique - vérifier l'accès
                 const patientId = patientUriMatch[1];
                 console.log(`🔍 [HOSPITAL] FedUP querying specific patient: ${patientId}`);
@@ -407,9 +426,11 @@ SELECT ?study WHERE { res:${patientId} ex:partOf ?study }`;
 
             } else {
                 // CAS 2: Requête générale (pas un patient spécifique) - vérifier les filtres d'étude
+                console.log(`➡️  [CAS 2] Requête générale - Vérification/Réécriture`);
 
                 // Détecter si l'utilisateur essaie d'interroger des études spécifiques
                 const studyFilterMatch = sparqlQuery.match(/(?:ex:partOf|<http:\/\/example\.org\/schema#partOf>)\s+(?:res:(\w+)|<http:\/\/example\.org\/resource\/(\w+)>)/gi);
+                console.log(`🔎 [DETECTION] Filtre d'étude existant: ${studyFilterMatch ? studyFilterMatch.join(', ') : 'NON'}`);
 
                 if (studyFilterMatch) {
                     // L'utilisateur a spécifié des études dans sa requête - vérifier qu'il y a accès
@@ -446,67 +467,63 @@ SELECT ?study WHERE { res:${patientId} ex:partOf ?study }`;
                     console.log(`✅ [HOSPITAL] User ${decoded.preferred_username} authorized to query requested studies`);
                 }
 
-                const hasPatientPattern = sparqlQuery.toLowerCase().includes('ex:patient') ||
-                                          sparqlQuery.toLowerCase().includes('<http://example.org/schema#patient>');
+                // TOUJOURS appliquer un filtre d'étude pour sécuriser les requêtes
+                // Sauf si l'utilisateur a déjà spécifié un filtre d'étude valide
+                if (!studyFilterMatch) {
+                    console.log(`🔒 [HOSPITAL] Applying mandatory study filter for security`);
 
-                // Appliquer la réécriture uniquement si aucun filtre d'étude n'est spécifié
-                if (hasPatientPattern && !studyFilterMatch) {
-                    // Détecter quelle variable l'utilisateur utilise pour les patients
-                    // Chercher des patterns comme "?patient a ex:Patient" ou "?p a <http://.../Patient>"
-                    let patientVar = '?p'; // Valeur par défaut
+                    // Détecter quelle variable l'utilisateur utilise pour les sujets
+                    // Chercher des patterns comme "?patient a ex:Patient", "?p a ...", ou "?s ?p ?o"
+                    let subjectVar = '?s'; // Valeur par défaut pour les requêtes génériques
 
+                    // D'abord chercher une variable patient explicite
                     const patientVarMatch = sparqlQuery.match(/(\?\w+)\s+a\s+(?:ex:Patient|<http:\/\/example\.org\/schema#Patient>)/i);
                     if (patientVarMatch) {
-                        patientVar = patientVarMatch[1];
-                        console.log(`🔍 [HOSPITAL] Detected patient variable: ${patientVar}`);
+                        subjectVar = patientVarMatch[1];
+                        console.log(`🔍 [HOSPITAL] Detected patient variable: ${subjectVar}`);
+                    } else {
+                        // Sinon, chercher la première variable dans la clause WHERE
+                        const firstVarMatch = sparqlQuery.match(/WHERE\s*\{\s*(\?\w+)/i);
+                        if (firstVarMatch) {
+                            subjectVar = firstVarMatch[1];
+                            console.log(`🔍 [HOSPITAL] Using first variable as subject: ${subjectVar}`);
+                        }
                     }
 
-                    // Détecter si la requête utilise des URIs complètes ou des préfixes
-                    const usesFullUris = sparqlQuery.includes('<http://example.org/schema#Patient>');
-
-                    // S'assurer que les préfixes nécessaires sont présents (si on n'utilise pas full URIs)
+                    // S'assurer que les préfixes nécessaires sont présents
                     const hasResPrefix = sparqlQuery.toLowerCase().includes('prefix res:');
                     const hasExPrefix = sparqlQuery.toLowerCase().includes('prefix ex:');
                     let prefixToAdd = '';
 
-                    if (!usesFullUris && !hasResPrefix) {
+                    if (!hasResPrefix) {
                         prefixToAdd = 'PREFIX res: <http://example.org/resource/>\n';
                     }
-                    if (!usesFullUris && !hasExPrefix) {
+                    if (!hasExPrefix) {
                         prefixToAdd += 'PREFIX ex: <http://example.org/schema#>\n';
                     }
 
-                    // Trouver la clause WHERE et ajouter le pattern ex:partOf
+                    // Trouver la clause WHERE et ajouter le filtre d'étude
                     const whereMatch = sparqlQuery.match(/WHERE\s*\{/i);
                     if (whereMatch) {
                         const whereIndex = whereMatch.index + whereMatch[0].length;
 
                         // Construire le filtre pour les études autorisées
+                        // On utilise un pattern qui filtre les données liées aux études autorisées
+                        const studiesFullUris = allowedStudies.map(s =>
+                            `<http://example.org/resource/${s.replace('res:', '')}>`
+                        );
+
                         let filterClause;
-
-                        if (usesFullUris) {
-                            // Utiliser des URIs complètes dans le filtre
-                            const studiesFullUris = allowedStudies.map(s =>
-                                `<http://example.org/resource/${s.replace('res:', '')}>`
-                            );
-
-                            if (studiesFullUris.length === 1) {
-                                filterClause = `\n  ${patientVar} <http://example.org/schema#partOf> ${studiesFullUris[0]} .`;
-                            } else {
-                                const studiesList = studiesFullUris.join(', ');
-                                filterClause = `\n  ${patientVar} <http://example.org/schema#partOf> ?study .\n  FILTER (?study IN (${studiesList}))`;
-                            }
+                        if (studiesFullUris.length === 1) {
+                            // Une seule étude - filtre simple
+                            filterClause = `\n  ${subjectVar} <http://example.org/schema#partOf> ${studiesFullUris[0]} .`;
                         } else {
-                            // Utiliser des préfixes dans le filtre
-                            if (allowedStudies.length === 1) {
-                                filterClause = `\n  ${patientVar} ex:partOf ${allowedStudies[0]} .`;
-                            } else {
-                                const studiesList = allowedStudies.join(', ');
-                                filterClause = `\n  ${patientVar} ex:partOf ?study .\n  FILTER (?study IN (${studiesList}))`;
-                            }
+                            // Plusieurs études - utiliser FILTER IN
+                            const studiesList = studiesFullUris.join(', ');
+                            filterClause = `\n  ${subjectVar} <http://example.org/schema#partOf> ?_allowedStudy .\n  FILTER (?_allowedStudy IN (${studiesList}))`;
                         }
 
-                        // Reconstruire la requête avec préfixe si nécessaire
+                        // Reconstruire la requête avec préfixe et filtre
                         rewrittenQuery = prefixToAdd +
                                        sparqlQuery.substring(0, whereIndex) +
                                        filterClause +
@@ -519,7 +536,7 @@ SELECT ?study WHERE { res:${patientId} ex:partOf ?study }`;
                 }
             }
 
-            // Vérifier la permission générale pour patient_data
+            // Vérifier la permission générale pour patient_data (utilise le token local)
             const permissionResult = await checkPermission(localToken, 'patient_data', 'read');
 
             if (!permissionResult.granted) {
@@ -534,6 +551,7 @@ SELECT ?study WHERE { res:${patientId} ex:partOf ?study }`;
             console.log(`✅ [HOSPITAL] Access GRANTED for user ${decoded.preferred_username} to patient_data`);
 
             // ÉTAPE 5: ENVOI VERS FUSEKI LOCAL (avec la requête réécrite)
+            // Note: On utilise le token Central unique - pas de token local
             const formBody = new URLSearchParams({
                 query: rewrittenQuery
             });
@@ -541,8 +559,8 @@ SELECT ?study WHERE { res:${patientId} ex:partOf ?study }`;
             const fusekiRes = await fetch(FUSEKI_URL, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": `Bearer ${localToken}` // Token local pour logs/audit
+                    "Content-Type": "application/x-www-form-urlencoded"
+                    // Pas de token pour Fuseki - l'autorisation est gérée par le proxy
                 },
                 body: formBody.toString()
             });

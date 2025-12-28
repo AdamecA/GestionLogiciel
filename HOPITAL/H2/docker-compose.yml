@@ -2,11 +2,11 @@ services:
   keycloak-h2:
     image: quay.io/keycloak/keycloak:latest
     container_name: keycloak-h2
-    command: start-dev --import-realm --features=preview --spi-script-upload-enabled=true
+    command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_SPI_SCRIPT_UPLOAD_ENABLED: true
+      KC_FEATURES: admin-fine-grained-authz:v1,token-exchange
     volumes:
       - ../../Data/config/hospital2Keycloak:/opt/keycloak/data/import
     ports:
