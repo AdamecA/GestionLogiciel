@@ -185,9 +185,43 @@ create_scope_permission() {
     fi
 }
 
-# Attendre que les Keycloaks soient prêts
-echo "⏳ Attente du démarrage des Keycloaks (30s)..."
-sleep 30
+# Fonction pour attendre qu'un Keycloak soit prêt
+wait_for_keycloak() {
+    local URL=$1
+    local NAME=$2
+    local MAX_ATTEMPTS=60
+    local ATTEMPT=1
+
+    echo "⏳ Attente de $NAME ($URL)..."
+
+    while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+        # Essayer d'accéder à l'endpoint de découverte OpenID
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/realms/master/.well-known/openid-configuration" 2>/dev/null)
+
+        if [ "$HTTP_CODE" = "200" ]; then
+            echo "  ✅ $NAME est prêt!"
+            return 0
+        fi
+
+        echo "  ⏳ Tentative $ATTEMPT/$MAX_ATTEMPTS - $NAME pas encore prêt (HTTP: $HTTP_CODE)..."
+        sleep 5
+        ATTEMPT=$((ATTEMPT + 1))
+    done
+
+    echo "  ❌ Timeout: $NAME n'a pas démarré après $MAX_ATTEMPTS tentatives"
+    return 1
+}
+
+# Attendre que tous les Keycloaks soient prêts
+echo "⏳ Attente du démarrage des Keycloaks..."
+
+wait_for_keycloak "http://localhost:8080" "Keycloak Central" || exit 1
+wait_for_keycloak "http://localhost:8081" "Keycloak H1" || exit 1
+wait_for_keycloak "http://localhost:8082" "Keycloak H2" || exit 1
+
+# Petit délai supplémentaire pour que les realms soient complètement chargés
+echo "⏳ Attente du chargement des realms (10s)..."
+sleep 10
 
 # ============================================================
 # HOSPITAL 1 - RBAC Configuration
